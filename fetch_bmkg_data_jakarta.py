@@ -1,3 +1,8 @@
+"""
+This file is for fetching BMKG weather data through public API from https://api.bmkg.go.id/publik/prakiraan-cuaca.
+Fetching is done one-by-one based on region code "adm4" and BMKG restricts access by 60 request per minute per IP.
+"""
+
 import time
 import requests
 import pandas as pd
@@ -542,4 +547,5 @@ def main():
         return 1
 
 if __name__ == "__main__":
+
     raise SystemExit(main())
