@@ -4,8 +4,12 @@ This is for example.
 It is still useful to create .db file from either fetch_bmkg_data_jakarta.py or fetch_region_border_big_data_jakarta.py.
 """
 import sqlite3
+import Path
 
-conn = sqlite3.connect("heat_risk.db")
+BASE_DIR = Path(__file__).resolve().parents[1]
+DB_PATH = BASE_DIR / "tables" / "heat_risk.db"
+
+conn = sqlite3.connect(DB_PATH)
 cursor = conn.cursor()
 
 # list of SQL files and path
