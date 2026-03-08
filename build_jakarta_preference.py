@@ -99,5 +99,4 @@ def main():
     print("\nPreview:")
     print(df.head(20).to_string(index=False))
 if __name__ == "__main__":
-
     main()
