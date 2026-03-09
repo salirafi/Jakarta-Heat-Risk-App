@@ -23,12 +23,8 @@ JAKARTA_MAINLAND_REGENCIES = {
     "31.75": "Kota Adm. Jakarta Timur",
 }
 
-HEADERS = {
-    "User-Agent": "heat-risk-app/1.0"
-}
-
 def get_json(url: str) -> dict:
-    resp = requests.get(url, headers=HEADERS, \
+    resp = requests.get(url, \
                         timeout=30) # set a timeout to avoid hanging indefinitely if the server is not responding
     resp.raise_for_status()  # raise Error if the request failed
     return resp.json()
@@ -102,4 +98,5 @@ def main():
     print("\nPreview:")
     print(df.head(20).to_string(index=False))
 if __name__ == "__main__":
+
     main()
