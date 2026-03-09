@@ -1,6 +1,8 @@
 """
 Build and save Jakarta ward (kelurahan) boundary data from RBI geodatabase from Badan Informasi Geospasial.
 Saving is done to SQLite.
+
+.gdb file for the ward boundary polygon data is downloaded from https://geoservices.big.go.id/portal/apps/webappviewer/index.html?id=cb58db080712468cb4bfd408dbde3d70
 """
 
 from __future__ import annotations
