@@ -10,7 +10,7 @@ This project is mostly based on Python, with data managed in SQLite environment.
 
 [tables](tables) contains SQLite tables for boundary polygon, `jakarta_kelurahan_boundary.sql`, and weather data, `heat_forecast_jakarta.sql`. The weather data time coverage spans from March 08 2026 08:00 WIB to March 10 2026 10:00 WIB. User can update, or more precisely append, this data by simply running [fetch_bmkg_data_jakarta.py](src/fetch_bmkg_data_jakarta.py) which will append the table with weather data from the user's current time to three days in the future. If there is overlap, the code will replace the old rows (with the same region code and time stamp). Each run will take up about 4 minutes due to polite delay of 1.01 seconds for each of 261 wards in Jakarta to respect BMKG request limit of 60 requests / minute / IP.
 
-[app](app) contains [app.py](app.py), which is the source code for creating the web app, making use of [Shiny for Python](https://shiny.posit.co/py/).
+[app](app) contains [app.py](app.py), which is the source code for creating the web app, making use of [Shiny for Python](https://shiny.posit.co/py/). There is also the source code for Streamlit-based web app in [jakarta_heat_risk_dashboard.py](app/jakarta_heat_risk_dashboard.py). The user can run it with Streamlit but note that it is still experimental version.
 
 ## Running
 
@@ -20,12 +20,23 @@ pip install -r requirements.txt
 ```
 It is recommended to work on virtual environment to isolate project dependencies.
 
-Then
+First, run
+```
+python3 .\create_db.py
+```
+to create SQLite database file `heat_risk.db` in `tables` folder. 
 
 If the user wants up-to-date weather data, in the parent folder, run
 ```
 python3 .\src\fetch_bmkg_data_jakarta.py
 ```
+Note that this might run for a while.
+
+Finally, run
+```
+shiny run .\app\app.py
+```
+to connect to the web app.
 
 
 ## Notes
