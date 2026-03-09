@@ -485,8 +485,8 @@ APP_CSS = """
         }
 
         .heat-index-section {
-            flex: 1 1 auto;
-            min-height: 320px;
+            flex: 1 1 280px;
+            min-height: 280px;
             display: flex;
             flex-direction: column;
         }
@@ -508,8 +508,8 @@ APP_CSS = """
         }
 
         .city-summary-section {
-            flex: 1 1 auto;
-            min-height: 320px;
+            flex: 1 1 280px;
+            min-height: 280px;
             display: flex;
             flex-direction: column;
         }
