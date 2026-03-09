@@ -20,10 +20,6 @@ TABLE_NAME = "heat_forecast_jakarta" # SQLite table name to save forecasts into
 LOG_DIR = BASE_DIR / "tables" / "logs" # directory to save log files, will be created if it does not exist
 LOG_DIR.mkdir(exist_ok=True)
 
-HEADERS = {
-    "User-Agent": "heat-risk-app/1.0"
-}
-
 logging.basicConfig(format='%(message)s', level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -63,7 +59,6 @@ def fetch_bmkg_by_adm4(
             response = requests.get(
                 API_URL,
                 params={"adm4": adm4},
-                headers=HEADERS,
                 timeout=timeout # second, set a timeout to avoid hanging indefinitely if BMKG server is not responding
             )
             response.raise_for_status() # raise Error if the request failed
@@ -549,4 +544,5 @@ def main():
         return 1
 
 if __name__ == "__main__":
+
     raise SystemExit(main())
