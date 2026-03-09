@@ -246,7 +246,7 @@ def server(input, output, session):
         now_time = pd.Timestamp.now(tz="Asia/Jakarta").tz_localize(None)
         # now_time = pd.Timestamp('2026-03-20 13:42:15.382917')
 
-        # If current time is outside table coverage, require manual selection
+        # if current time is outside table coverage, require manual selection
         if now_time < min_time or now_time > max_time:
 
             needs_manual_date.set(True)
@@ -268,7 +268,7 @@ def server(input, output, session):
             current_query_window.set(window)
             return
 
-        # Current time is inside table coverage -> auto mode
+        # current time is inside table coverage -> auto mode
         rounded_now = floor_to_time_step(now_time, step_hours=3)
         auto_start = get_nearest_available_start_time(rounded_now)
 
@@ -526,7 +526,7 @@ def server(input, output, session):
         if widget is None or len(widget.data) == 0:
             return
 
-        # Update only dynamic trace data.
+        # update only dynamic trace data
         widget.data[0].z = payload["z"]
         widget.data[0].customdata = payload["customdata"]
 
@@ -550,14 +550,11 @@ def server(input, output, session):
         widget.data[1].x = payload["x"]
         widget.data[1].y = payload["y_temp"]
 
-        # Update y-axis range
         widget.layout.yaxis.range = payload["y_range"]
 
-        # Toggle axes visibility
         widget.layout.xaxis.visible = not payload["is_empty"]
         widget.layout.yaxis.visible = not payload["is_empty"]
 
-        # Toggle empty-state annotation
         if payload["is_empty"]:
             widget.layout.annotations = [
                 dict(
@@ -1072,3 +1069,4 @@ def server(input, output, session):
                 class_="footer-text"),
             class_="footer-section",
         )
+
