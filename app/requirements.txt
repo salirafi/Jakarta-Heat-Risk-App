@@ -1,0 +1,10 @@
+geopandas==1.1.2
+matplotlib==3.10.8
+numpy==2.4.2
+pandas==3.0.1
+plotly==6.6.0
+pydeck==0.9.1
+Shapely==2.1.2
+shiny==1.5.1
+shinywidgets==0.7.1
+streamlit==1.55.0
