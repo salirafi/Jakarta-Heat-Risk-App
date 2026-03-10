@@ -1,2 +1,2 @@
 @echo off
-python .\src\fetch_bmkg_data_jakarta.py
+python .\src_fetch\fetch_bmkg_data_jakarta.py
