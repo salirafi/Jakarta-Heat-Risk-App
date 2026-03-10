@@ -32,7 +32,7 @@ python3 .\src\fetch_bmkg_data_jakarta.py
 ```
 or, if the user uses Windows, alternatively type in terminal
 ```
-fetch_bmkg_data.bat
+fetch_bmkg_data_jakarta.bat
 ```
 to run the script through .bat file. Note that this might run for a while.
 
