@@ -119,6 +119,7 @@ APP_CSS = """
         .caption {
             color: #666666;
             font-size: 0.95rem;
+            margin-bottom: 0.1rem;
         }
                   
         .filter-block {
