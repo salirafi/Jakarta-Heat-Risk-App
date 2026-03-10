@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 from shiny import reactive, render, ui
-from shinywidgets import render_widget
+from shinywidgets import render_widget, output_widget
 
 from text_context import *
 from config import *
@@ -14,6 +14,11 @@ from helpers.plot_helpers import *
 from ui.components import *
 
 def server(input, output, session):
+
+    language = reactive.Value("en")
+    manual_start_date = reactive.Value(None)
+    needs_manual_date = reactive.Value(False)
+    current_query_window = reactive.Value({"start_time": None, "end_time": None})
 
     def lang_text(id_text: str, en_text: str) -> str:
         return id_text if language.get() == "id" else en_text
@@ -47,11 +52,6 @@ def server(input, output, session):
             9: "Sep", 10: "Okt", 11: "Nov", 12: "Des",
         }
         return f"{bulan[ts.month]} {ts.day:02d} {ts.year}, {ts.hour:02d}:{ts.minute:02d}"
-
-    language = reactive.Value("en")
-    manual_start_date = reactive.Value(None)
-    needs_manual_date = reactive.Value(False)
-    current_query_window = reactive.Value({"start_time": None, "end_time": None})
 
     def risk_label(level: str) -> str:
         labels = {
@@ -243,8 +243,8 @@ def server(input, output, session):
         #     current_query_window.set({"start_time": None, "end_time": None})
         #     return
 
-        now_time = pd.Timestamp.now(tz="Asia/Jakarta").tz_localize(None)
-        # now_time = pd.Timestamp('2026-03-20 13:42:15.382917')
+        # now_time = pd.Timestamp.now(tz="Asia/Jakarta").tz_localize(None)
+        now_time = pd.Timestamp('2026-03-20 13:42:15.382917')
 
         # If current time is outside table coverage, require manual selection
         if now_time < min_time or now_time > max_time:
@@ -754,10 +754,10 @@ def server(input, output, session):
     @output
     @render.ui
     def current_time_caption():
-        # now_local = pd.Timestamp('2026-03-20 13:42:15.382917')
-        now_local = pd.Timestamp.now(tz="Asia/Jakarta")
+        now_local = pd.Timestamp('2026-03-20 13:42:15.382917')
+        # now_local = pd.Timestamp.now(tz="Asia/Jakarta")
         label = month_label(now_local)
-        return ui.div(f"{label} WIB", class_="current-time-caption")
+        return ui.div(f"Current Jakarta time: {label} WIB", class_="current-time-caption")
 
     @output
     @render.ui
@@ -797,8 +797,20 @@ def server(input, output, session):
 
         if df.empty:
             return ui.div(
-                lang_text("Tidak ada prakiraan mendatang yang tersedia.", "No future forecasts available."),
-                class_="empty-note",
+                ui.p(
+                    lang_text(
+                        "Tidak ada prakiraan mendatang yang tersedia.",
+                        "No future forecasts available."
+                    ),
+                    class_="empty-note",
+                ),
+                ui.p(
+                    lang_text(
+                        "Waktu Anda saat ini di luar lingkup waktu yang tersedia di database. Pastikan database sudah diperbarui.",
+                        "Your current time is outside the database time coverage. Please make sure the database is updated to the latest."
+                    ),
+                    class_="empty-note",
+                ),
             )
 
         cards = []
@@ -824,10 +836,47 @@ def server(input, output, session):
 
         if not cards:
             return ui.div(
-                lang_text("Tidak ada prakiraan mendatang yang tersedia.", "No future forecasts available."),
-                class_="empty-note",
+                ui.p(
+                    lang_text(
+                        "Tidak ada prakiraan mendatang yang tersedia.",
+                        "No future forecasts available."
+                    ),
+                    class_="empty-note",
+                ),
+                ui.p(
+                    lang_text(
+                        "Waktu Anda saat ini di luar lingkup waktu yang tersedia di database. Pastikan database sudah diperbarui.",
+                        "Your current time is outside the database time coverage. Please make sure the database is updated to the latest."
+                    ),
+                    class_="empty-note",
+                ),
             )
         return ui.div(ui.HTML("".join(cards)), class_="forecast-scroll")
+
+    @output
+    @render.ui
+    def heat_index_evolution_ui():
+        df = future_forecast_df()
+
+        if df.empty:
+            return ui.div(
+                ui.p(
+                    lang_text(
+                        "Tidak ada prakiraan mendatang yang tersedia.",
+                        "No future forecasts available."
+                    ),
+                    class_="empty-note",
+                ),
+                ui.p(
+                    lang_text(
+                        "Waktu Anda saat ini di luar lingkup waktu yang tersedia di database. Pastikan database sudah diperbarui.",
+                        "Your current time is outside the database time coverage. Please make sure the database is updated to the latest."
+                    ),
+                    class_="empty-note",
+                ),
+            )
+
+        return output_widget("heat_index_evolution_plot")
     
     @render_widget
     def heat_index_evolution_plot():
@@ -919,13 +968,28 @@ def server(input, output, session):
 
         return ui.div(
             ui.h5(
-                lang_text("Pilih tanggal awal", "Choose a start date"),
+                lang_text("Tidak ada yang tersedia", "No data available"),
                 class_="panel-subtitle",
             ),
             ui.p(
                 lang_text(
-                    "Data untuk waktu saat ini tidak tersedia. Silakan pilih tanggal awal dari kalender untuk data historis.",
-                    "Forecast data for the current time is not available. Please choose a start date from the calendar for historical data."
+                    ui.span(
+                        "Waktu Anda saat ini di luar lingkup waktu yang tersedia di database. Tekan di sini atau lihat ",
+                        ui.a("repositori Github", href="https://github.com/salirafi/Jakarta-Heat-Risk-App/blob/main/README.md", target="_blank"),
+                        " untuk mendapatkan data terbaru. Proses ini mungkin memakan waktu sekitar 5 menit."
+                    ),
+                    ui.span(
+                        "Your current time is outside the database time coverage. Click here or see the ",
+                        ui.a("Github repository", href="https://github.com/salirafi/Jakarta-Heat-Risk-App/blob/main/README.md", target="_blank"),
+                        " to get the latest data. It may take about 5 minutes."
+                    ),
+                ),
+                class_="caption",
+            ),
+            ui.p(
+                lang_text(
+                    "Silakan pilih tanggal awal dari kalender untuk data historis ditampilkan di peta.",
+                    "Please choose a start date from the calendar for historical data to be shown on the map."
                 ),
                 class_="caption",
             ),
@@ -938,21 +1002,6 @@ def server(input, output, session):
                 format="yyyy-mm-dd",
                 startview="month",
                 weekstart=1,
-            ),
-            ui.p(
-                lang_text(
-                    ui.span(
-                        "Lihat ",
-                        ui.a("repositori Github", href="https://github.com/salirafi/Jakarta-Heat-Risk-App/blob/main/README.md", target="_blank"),
-                        " untuk melihat cara mendapatkan data terbaru."
-                    ),
-                    ui.span(
-                        "See the ",
-                        ui.a("Github repository", href="https://github.com/salirafi/Jakarta-Heat-Risk-App/blob/main/README.md", target="_blank"),
-                        " to know how to get the latest data."
-                    ),
-                ),
-                class_="caption",
             ),
             class_="panel-box",
             style="margin-bottom: 1rem;",
@@ -1021,8 +1070,8 @@ def server(input, output, session):
 
         ui.notification_show(
             lang_text(
-                "Data untuk waktu saat ini tidak tersedia. Silakan pilih tanggal awal dari kalender untuk data historis.",
-                "Forecast data for the current time is not available. Please choose a start date from the calendar for historical data."
+                "Data untuk waktu saat ini tidak tersedia.",
+                "Forecast data for the current time is not available."
             ),
             type="warning",
             duration=6,
