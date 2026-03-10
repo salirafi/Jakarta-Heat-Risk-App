@@ -30,7 +30,11 @@ If the user wants up-to-date weather data, in the parent folder, run
 ```
 python3 .\src\fetch_bmkg_data_jakarta.py
 ```
-Note that this might run for a while.
+or alternatively type in terminal
+```
+fetch_bmkg_data.bat
+```
+to run the script through .bat file. Note that this might run for a while.
 
 Finally, run
 ```
