@@ -6,11 +6,13 @@ This repository contains the source code to build Python-based web application w
 
 This project is mostly based on Python, with data managed in SQLite environment. 
 
-[src](src) contains source code for fetching BMKG data ([fetch_bmkg_data_jakarta.py](src/fetch_bmkg_data_jakarta.py)), retrieving region code from [public API](https://wilayah.id/api) ([build_jakarta_preference.py](src/build_jakarta_preference.py)), and reading the boundary polygons from RBI data provided by Badan Informasi Geospasial ([fetch_region_border_big_data_jakarta.py](src/fetch_region_border_big_data_jakarta.py)). The first and last file create SQLite tables with names `heat_forecast_jakarta` and `jakarta_kelurahan_boundary`, respectively, whilst the region code is saved as `jakarta_preference.csv`. Note that the only time-dependent data in this repository is the BMKG weather data, so the boundary polygon and region code will always be valid.
+[src_fetch](src_fetch) contains source code for fetching BMKG data ([fetch_bmkg_data_jakarta.py](src_fetch/fetch_bmkg_data_jakarta.py)), retrieving region code from [public API](https://wilayah.id/api) ([build_jakarta_preference.py](src_fetch/build_jakarta_preference.py)), and reading the boundary polygons from RBI data provided by Badan Informasi Geospasial ([fetch_region_border_big_data_jakarta.py](src_fetch/fetch_region_border_big_data_jakarta.py)). The first and last file create SQLite tables with names `heat_forecast_jakarta` and `jakarta_kelurahan_boundary`, respectively, whilst the region code is saved as `jakarta_preference.csv`. Note that the only time-dependent data in this repository is the BMKG weather data, so the boundary polygon and region code will always be valid.
 
-[tables](tables) contains SQLite tables for boundary polygon, `jakarta_kelurahan_boundary.sql`, and weather data, `heat_forecast_jakarta.sql`. The weather data time coverage spans from March 08 2026 08:00 WIB to March 10 2026 10:00 WIB. User can update, or more precisely append, this data by simply running [fetch_bmkg_data_jakarta.py](src/fetch_bmkg_data_jakarta.py) which will append the table with weather data from the user's current time to three days in the future. If there is overlap, the code will replace the old rows (with the same region code and time stamp). Each run will take up about 4 minutes due to polite delay of 1.01 seconds for each of 261 wards in Jakarta to respect BMKG request limit of 60 requests / minute / IP.
+[tables](tables) contains SQLite tables for boundary polygon, `jakarta_kelurahan_boundary.sql`, and weather data, `heat_forecast_jakarta.sql`. The weather data time coverage spans from March 08 2026 08:00 WIB to March 10 2026 10:00 WIB. User can update, or more precisely append, this data by simply running [fetch_bmkg_data_jakarta.py](src_fetch/fetch_bmkg_data_jakarta.py) which will append the table with weather data from the user's current time to three days in the future. If there is overlap, the code will replace the old rows (with the same region code and time stamp). Each run will take up about 4 minutes due to polite delay of 1.01 seconds for each of 261 wards in Jakarta to respect BMKG request limit of 60 requests / minute / IP.
 
-[app](app) contains [app.py](app.py), which is the source code for creating the web app, making use of [Shiny for Python](https://shiny.posit.co/py/). There is also the source code for Streamlit-based web app in [jakarta_heat_risk_dashboard.py](app/jakarta_heat_risk_dashboard.py). The user can run it with Streamlit but note that it is still experimental version.
+[src_app](src_app) contains the source code for creating the web app, making use of [Shiny for Python](https://shiny.posit.co/py/). 
+
+The parent folder contains [app.py](app.py), script to run the web app. There is also the source code for Streamlit-based web app in [jakarta_heat_risk_dashboard.py](app/jakarta_heat_risk_dashboard.py). The user can run it with Streamlit but note that it is still experimental version.
 
 ## Running
 
@@ -28,7 +30,7 @@ to create SQLite database file `heat_risk.db` in `tables` folder.
 
 If the user wants up-to-date weather data, in the parent folder, run
 ```
-python3 .\src\fetch_bmkg_data_jakarta.py
+python3 .\src_fetch\fetch_bmkg_data_jakarta.py
 ```
 or, if the user uses Windows, alternatively type in terminal
 ```
@@ -38,7 +40,7 @@ to run the script through .bat file. Note that this might run for a while.
 
 Finally, run
 ```
-shiny run .\app\app.py
+shiny run app.py
 ```
 to connect to the web app. Please note that the web app shows the weather forecast from roughly the user's current system time up to 3 days to the future whenever data is available.
 
