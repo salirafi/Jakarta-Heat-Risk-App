@@ -243,8 +243,8 @@ def server(input, output, session):
         #     current_query_window.set({"start_time": None, "end_time": None})
         #     return
 
-        # now_time = pd.Timestamp.now(tz="Asia/Jakarta").tz_localize(None)
-        now_time = pd.Timestamp('2026-03-20 13:42:15.382917')
+        now_time = pd.Timestamp.now(tz="Asia/Jakarta").tz_localize(None)
+        # now_time = pd.Timestamp('2026-03-20 13:42:15.382917')
 
         # If current time is outside table coverage, require manual selection
         if now_time < min_time or now_time > max_time:
@@ -754,8 +754,8 @@ def server(input, output, session):
     @output
     @render.ui
     def current_time_caption():
-        now_local = pd.Timestamp('2026-03-20 13:42:15.382917')
-        # now_local = pd.Timestamp.now(tz="Asia/Jakarta")
+        # now_local = pd.Timestamp('2026-03-20 13:42:15.382917')
+        now_local = pd.Timestamp.now(tz="Asia/Jakarta")
         label = month_label(now_local)
         return ui.div(f"Current Jakarta time: {label} WIB", class_="current-time-caption")
 
@@ -1128,3 +1128,4 @@ def server(input, output, session):
                 class_="footer-text"),
             class_="footer-section",
         )
+
