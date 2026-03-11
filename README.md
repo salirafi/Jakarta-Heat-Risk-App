@@ -10,7 +10,7 @@ This project depends heavily on [pandas](https://pandas.pydata.org/), with data 
 
 [tables](tables) contains SQLite table for boundary polygon and weather data in `heat_risk.db`. The weather data time coverage spans from March 11 2026 20:00 WIB to March 13 2026 20:00 WIB. User can update, or more precisely append, this data by simply running [fetch_weather_data.py](fetch/fetch_weather_data.py) which will append the table with weather data from the user's current time to three days in the future. If there is overlap, the code will replace the old rows (with the same region code and time stamp). Each run will take up about 4 minutes due to polite delay of 1.01 seconds for each of 261 wards in Jakarta to respect BMKG request limit of 60 requests / minute / IP. The file also contains `create_db.py` to create a SQLite database named `heat_risk.db`.
 
-[src](src) contains the source code for creating the web app, making use of [Shiny for Python](https://shiny.posit.co/py/), while [www](www) contains the needed CSS file (the naming is set by Shiny requirement; see [here](https://shiny.posit.co/py/docs/ui-customize.html)).
+[src](src) contains the source code for creating the web app, making use of [Shiny for Python](https://shiny.posit.co/py/).
 
 The parent folder contains [app.py](app.py), script to run the web app.
 
