@@ -18,8 +18,8 @@ from src.plotting import *
 
 app_ui = ui.page_fluid(
 
-    ui.tags.link(href="styles.css", rel="stylesheet"),
-    # ui.head_content(ui.include_css("styles.css")),
+    # ui.tags.link(href="styles.css", rel="stylesheet"),
+    ui.head_content(ui.include_css("styles.css")),
 
     ui.div(
         ui.div("Jakarta's Heat Risk Map and Forecast", class_="page-title"),
@@ -679,5 +679,6 @@ def server(input, output, _):
             ),
             style="margin-top: 1.5rem; margin-bottom: 0.5rem"
         )
+
 
 app = App(app_ui, server)
