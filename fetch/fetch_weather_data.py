@@ -16,7 +16,8 @@ BASE_DIR = Path(__file__).resolve().parents[1]
 API_URL = "https://api.bmkg.go.id/publik/prakiraan-cuaca"  # BMKG open weather forecast API endpoint
 REFERENCE_FILE = BASE_DIR / "jakarta_reference.csv" # output from build_jakarta_preference.py, containing list of adm4 codes to fetch forecasts for
 DB_PATH = BASE_DIR / "tables" / "heat_risk.db" # SQLite database file to save forecasts into
-TABLE_NAME = "ward_weather_table" # SQLite table name to save forecasts into
+WEATHER_TABLE = "ward_weather_table" # SQLite table name to save forecasts into
+CITY_SUMMARY_TABLE = "city_summary_table"
 LOG_DIR = BASE_DIR / "logs" # directory to save log files, will be created if it does not exist
 LOG_DIR.mkdir(exist_ok=True)
 
@@ -123,7 +124,6 @@ def flatten_forecast(data: dict, adm4: str) -> pd.DataFrame:
                     "temperature_c": pd.to_numeric(item.get("t"), errors="coerce"), # temperature in celsius
                     "humidity_ptg": pd.to_numeric(item.get("hu"), errors="coerce"), # humidity in percentage
                     "weather_desc": item.get("weather_desc_en"), # weather description in English
-                    "analysis_date": item.get("analysis_date"),
                 }
             )
 
@@ -133,7 +133,6 @@ def flatten_forecast(data: dict, adm4: str) -> pd.DataFrame:
 
         # converting datetime columns to pandas datetime type, Timestamp, for easier manipulation later
         df["local_datetime"] = pd.to_datetime(df["local_datetime"], errors="coerce")
-        df["analysis_date"] = pd.to_datetime(df["analysis_date"], errors="coerce")
 
         # sort by time, important fort interpolation later
         df = df.sort_values("local_datetime").reset_index(drop=True)
@@ -253,9 +252,6 @@ def interpolate_one_adm4_to_grid(df_one: pd.DataFrame, target_grid: pd.DatetimeI
     # categorical / descriptive fields
     work["weather_desc"] = work["weather_desc"].ffill().bfill()
 
-    # analysis_date: use nearest available analysis_date
-    work["analysis_date"] = work["analysis_date"].ffill().bfill()
-
     out = work.loc[target_grid].reset_index().rename(columns={"index": "local_datetime"}) # keep only the target grid timestamps
 
     # compute heat index and risk level for each row
@@ -270,7 +266,7 @@ def interpolate_one_adm4_to_grid(df_one: pd.DataFrame, target_grid: pd.DatetimeI
             "adm4", "desa_kelurahan", "kecamatan", "kota_kabupaten", "provinsi",
             "latitude", "longitude", "timezone", "local_datetime",
             "temperature_c", "humidity_ptg", "heat_index_c", "risk_level",
-            "weather_desc", "analysis_date",
+            "weather_desc",
         ]
     ]
 
@@ -435,12 +431,25 @@ def fetch_all_jakarta_forecasts(ref_df: pd.DataFrame,
     logger.info("Combined aligned forecast rows: %s", len(aligned_df))
     return aligned_df
 
+# calculate average value of relevant parameters for each city for plotting
+def build_city_summary_table(df: pd.DataFrame) -> pd.DataFrame:
+    summary = (
+        df
+        .groupby(["local_datetime", "kota_kabupaten"], as_index=False) # group by cities' name and time -> average value each time each city
+        .agg( # perform aggregate function (mean) to each parameter for each city
+            avg_temperature_c=("temperature_c", "mean"),
+            avg_humidity_ptg=("humidity_ptg", "mean"),
+            avg_heat_index_c=("heat_index_c", "mean"),
+        )
+    )
+    return summary
+
 # this function ensures that the SQLite table used to store the forecasts exists before writing data into it
 # If the table does not exist, it creates it. If it already exists, nothing happens.
-def create_table_if_needed(conn: sqlite3.Connection, table_name: str) -> None:
+def create_table_if_needed(conn: sqlite3.Connection) -> None:
     conn.execute(
         f"""
-        CREATE TABLE IF NOT EXISTS {table_name} (
+        CREATE TABLE IF NOT EXISTS {WEATHER_TABLE} (
             adm4 TEXT,
             desa_kelurahan TEXT,
             kecamatan TEXT,
@@ -455,7 +464,6 @@ def create_table_if_needed(conn: sqlite3.Connection, table_name: str) -> None:
             heat_index_c REAL,
             risk_level TEXT,
             weather_desc TEXT,
-            analysis_date TEXT,
             fetched_at TEXT DEFAULT CURRENT_TIMESTAMP,
             PRIMARY KEY("local_datetime","adm4")
         )
@@ -463,7 +471,7 @@ def create_table_if_needed(conn: sqlite3.Connection, table_name: str) -> None:
     )
     conn.commit()
 
-def save_to_sqlite(df: pd.DataFrame, db_path: Path, table_name: str) -> None:
+def save_to_sqlite(df: pd.DataFrame, db_path: Path) -> None:
     """
     Delete old rows for the adm4 codes being refreshed, then append fresh rows.
     """
@@ -474,46 +482,39 @@ def save_to_sqlite(df: pd.DataFrame, db_path: Path, table_name: str) -> None:
     conn = sqlite3.connect(db_path)
 
     try:
-        create_table_if_needed(conn, table_name)
+        create_table_if_needed(conn)
 
         df_to_save = df.copy()
+
         df_to_save["local_datetime"] = df_to_save["local_datetime"].astype(str) # convert datetime to string for SQLite, because SQLite does not have a native datetime type
-        df_to_save["analysis_date"] = df_to_save["analysis_date"].astype(str) # same for analysis_date
-        df_to_save["fetched_at"] = df_to_save["fetched_at"].astype(str) # same for fetched_at
+        df_to_save["fetched_at"] = df_to_save["fetched_at"].astype(str)
 
-        records = df_to_save.to_dict(orient="records") # convert DataFrame to list of dicts for easier insertion into SQLite
-        
-        columns = list(df_to_save.columns)
-        placeholders = ", ".join(["?"] * len(columns)) # create placeholders for parameterized query
-        col_sql = ", ".join(columns)
+        df_to_save.to_sql(WEATHER_TABLE, conn, if_exists="replace", index=False) # IMPORTANT! this will replace all existing rows so no past data recorded
 
-        # INSERT OR REPLACE lets SQLite overwrite only the matching rows based on primary key: local_datetime and adm4
-        sql = f"""
-        INSERT OR REPLACE INTO {table_name} ({col_sql})
-        VALUES ({placeholders})
-        """
-        # insert all rows using executemany
-        conn.executemany(
-            sql,
-            [tuple(record[col] for col in columns) for record in records]
+        # create SQL indexes for faster querying
+        conn.execute(f"""
+            CREATE INDEX IF NOT EXISTS idx_weather_time
+            ON ward_weather_table(local_datetime);
+            """)
+        conn.execute(f"""
+            CREATE INDEX IF NOT EXISTS idx_weather_region_time
+            ON ward_weather_table(adm4, local_datetime);
+            """)
+
+        summary_df = build_city_summary_table(df)
+        summary_df.to_sql(
+            CITY_SUMMARY_TABLE,
+            conn,
+            if_exists="replace",
+            index=False,
         )
+        conn.execute(f"""
+            CREATE INDEX IF NOT EXISTS idx_city_summary_time
+            ON {CITY_SUMMARY_TABLE} (local_datetime);
+            """)
 
         conn.commit()
-        logger.info("Saved %s rows into '%s' at %s", len(df_to_save), table_name, db_path)
 
-    finally:
-        conn.close()
-
-def preview_sqlite_table(db_path: Path, table_name: str, limit: int = 10) -> pd.DataFrame:
-    conn = sqlite3.connect(db_path)
-    try:
-        query = f"""
-        SELECT *
-        FROM {table_name}
-        ORDER BY local_datetime, adm4
-        LIMIT {limit}
-        """
-        return pd.read_sql_query(query, conn)
     finally:
         conn.close()
 
@@ -537,7 +538,7 @@ def main():
             return 1
 
         df = add_fetched_at(df)
-        save_to_sqlite(df, DB_PATH, TABLE_NAME)
+        save_to_sqlite(df, DB_PATH)
 
         print("")
         logger.info("=== BMKG refresh job completed successfully ===")

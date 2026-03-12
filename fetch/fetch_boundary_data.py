@@ -15,8 +15,9 @@ import pandas as pd
 BASE_DIR = Path(__file__).resolve().parents[1]
 DB_PATH = BASE_DIR / "tables" / "heat_risk.db"
 
-GDB_PATH = Path(r"RBI10K_ADMINISTRASI_DESA_20230928.gdb")
+GDB_PATH = BASE_DIR / "fetch" / "RBI10K_ADMINISTRASI_DESA_20230928.gdb"
 OUTPUT_TABLE = "ward_boundary_table"
+OUTPUT_GEOJSON = BASE_DIR / "tables" / "jakarta_boundary_simplified.geojson"
 # layer's name can be checked with the following code: print(fiona.listlayers(gdb_path)); see list_gdb_layers() function below
 GDB_LAYER = "ADMINISTRASI_AR_DESAKEL"
 
@@ -72,59 +73,55 @@ def filter_jakarta_boundaries(gdf: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
         & (gdf["kotkab_clean"].isin(JAKARTA_CITIES))
     ].copy()
 
-def build_boundary_table(gdf_jakarta: gpd.GeoDataFrame) -> pd.DataFrame:
-    """Convert Jakarta boundaries into a SQLite-friendly table with WKB geometry."""
-    gdf_wgs84 = gdf_jakarta.to_crs(epsg=4326).copy() # ensure it's in WGS84 for easier use later
-    gdf_wgs84["geometry_wkb"] = gdf_wgs84.geometry.to_wkb() # convert geometry to WKB format for easier storage in SQLite
+# function to build the boundary table and export as GeoJSON
+def build_and_export_table(gdf: gpd.GeoDataFrame) -> pd.DataFrame:
+
+    gdf = gdf.copy()
+    gdf = gdf.to_crs(epsg=4326)
+    gdf["geometry"] = gdf["geometry"].simplify(tolerance=0.001,preserve_topology=True) # save a simplified version of the geometry for faster loading
+    gdf["geometry"] = gdf.geometry.make_valid() # repair invalid geometries to be valid
+
+    # look https://geopandas.org/en/stable/docs/user_guide/missing_empty.html for differences between empty and missing
+    gdf = gdf[gdf.geometry.notna()] # drop missing geometries
+    gdf = gdf[~gdf.geometry.is_empty] # drop empty geometries
+
+    gdf["KDEPUM"] = gdf["KDEPUM"].astype(str).str.strip()
+    gdf = gdf.drop_duplicates(subset=["KDEPUM"]).reset_index(drop=True)  # keep only distinct region code values
 
     # keep only the relevant columns (omitting 'NAMOBJ' and 'geometry' columns)
-    boundary_df = gdf_wgs84[
+    gdf = gdf[
         [
             "KDEPUM",
-            "WADMKD",
-            "WADMKC",
-            "WADMKK",
-            "WADMPR",
-            "geometry_wkb",
+            "geometry",
         ]
     ].copy()
 
     # rename columns to match the name formatting in BMKG data
-    boundary_df = boundary_df.rename(
-        columns={
-            "KDEPUM": "adm4",
-            "WADMKD": "desa_kelurahan",
-            "WADMKC": "kecamatan",
-            "WADMKK": "kota_kabupaten",
-            "WADMPR": "provinsi",
-        }
-    )
+    gdf = gdf.rename(
+        columns={"KDEPUM": "adm4",}
+        )  
 
-    boundary_df["adm4"] = boundary_df["adm4"].astype(str).str.strip()
-    boundary_df = boundary_df.drop_duplicates(subset=["adm4"]).reset_index(drop=True)
-    return boundary_df
+    OUTPUT_GEOJSON.parent.mkdir(parents=True, exist_ok=True)
+    gdf.to_file(OUTPUT_GEOJSON, driver="GeoJSON") # save as GeoJSON
 
-def save_boundary_table(boundary_df: pd.DataFrame, db_path: Path, table_name: str) -> None:
+    # Convert Jakarta boundaries into a SQLite-friendly table with WKB geometry
+    gdf["geometry"] = gdf.geometry.to_wkb() # convert geometry to WKB format for easier storage in SQLite; changed to pd.DataFrame
+
+    return gdf
+
+def save_boundary_table(df: pd.DataFrame, db_path: Path, table_name: str) -> None:
     """Write the boundary table into SQLite, replacing any older version"""
     with sqlite3.connect(db_path) as conn:
+        
         # should be replace not append, since we want to overwrite any old version of the table
-        boundary_df.to_sql(table_name, conn, if_exists="replace", index=False)
+        df.to_sql(table_name, conn, if_exists="replace", index=False)
 
 def main() -> None:
 
     layers = list_gdb_layers(GDB_PATH)
-
     gdf = load_boundary_layer(GDB_PATH, GDB_LAYER)
-
     gdf_jakarta = filter_jakarta_boundaries(gdf)
-
-    # save the full geometry
-    # boundary_df = build_boundary_table(gdf_jakarta)
-    # save_boundary_table(boundary_df, DB_PATH, OUTPUT_TABLE)
-
-    # save also a simplified version of the geometry for faster loading later
-    gdf_jakarta["geometry"] = gdf_jakarta["geometry"].simplify(tolerance=0.001,preserve_topology=True)
-    boundary_df = build_boundary_table(gdf_jakarta)
+    boundary_df = build_and_export_table(gdf_jakarta)
     save_boundary_table(boundary_df, DB_PATH, OUTPUT_TABLE+'_simplified')
 
     print("")
