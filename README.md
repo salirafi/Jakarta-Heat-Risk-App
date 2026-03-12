@@ -42,7 +42,7 @@ Finally, run
 ```
 shiny run app.py
 ```
-to connect to the web app. Please note that the web app shows the weather forecast from roughly the user's current system time up to 1 day (by default) to the future whenever data is available. ALso note that first time loading the web might take a few seconds.
+to connect to the web app. Please note that the web app shows the weather forecast from roughly the user's current system time up to 1 day (by default) to the future whenever data is available. Also note that first time loading the web might take a few seconds.
 
 If the user wants to run [fetch_region_border_big_data_jakarta.py](src/fetch_boundary_data.py), make sure they have downloaded the required .gdb file from [here](https://geoservices.big.go.id/portal/apps/webappviewer/index.html?id=cb58db080712468cb4bfd408dbde3d70).
 
