@@ -36,7 +36,7 @@ or, if the user uses Windows, alternatively type in terminal
 ```
 fetch_weather_data.bat
 ```
-to run the script through .bat file. Note that this might run for a while.
+or simply double-click it to run the script through .bat file. Note that this might run for a while. If the database is not up-to-date (the database time coverage does not cover the current Jakarta time), then the app pops out a blocker notification prompting the user to update the database.
 
 Finally, run
 ```
