@@ -1,11 +1,9 @@
 import sqlite3
 import pandas as pd
-import geopandas as gpd
-from shapely import wkb
 import json
 from html import escape
 
-from .constant import DB_PATH, BOUNDARY_TABLE, WEATHER_TABLE
+from .constant import DB_PATH, BOUNDARY_GEOJSON_PATH, WEATHER_TABLE, CITY_SUMMARY_TABLE
 
 def guide_button_id(level: str) -> str:
     return {
@@ -72,36 +70,22 @@ def get_table_names() -> list[str]:
     return tables["name"].tolist()
 
 # function to load boundary data from boundary table
-def load_boundary_data() -> gpd.GeoDataFrame:
+def load_boundary_data() -> tuple[pd.DataFrame, dict]:
 
-    # returns region code and geometry column
-    query = f"""
-            SELECT adm4, geometry_wkb
-            FROM {BOUNDARY_TABLE};
-            """
-    boundary_df = run_query(query)
+    with open(BOUNDARY_GEOJSON_PATH, "r", encoding="utf-8") as f:
+        geojson = json.load(f) # becomes dict
 
-    if boundary_df.empty:
-        return gpd.GeoDataFrame(boundary_df, geometry=[], crs="EPSG:4326") # if table is empty, return empty geopandas dataframe
+    features = geojson.get("features", [])
+    boundary_index = pd.DataFrame(
+        {
+            "adm4": [
+                str(feature.get("properties", {}).get("adm4", "")).strip()
+                for feature in features
+            ]
+        }
+    )
 
-    boundary_df["adm4"] = boundary_df["adm4"].astype(str).str.strip() # remove trailing and leading whitespace
-    boundary_df["geometry_wkb"] = boundary_df["geometry_wkb"].apply(wkb.loads) # convert WKB to polygon geometry
-
-    # note that, even though the column name is geometry_wkb, at this stage, it is already in polygon geometry
-    # rewriting the column avoids additional large column
-    gdf = gpd.GeoDataFrame(boundary_df, geometry="geometry_wkb", crs="EPSG:4326")
-    
-    gdf["geometry_wkb"] = gdf.make_valid() # repair invalid geometries to be valid
-
-    # look https://geopandas.org/en/stable/docs/user_guide/missing_empty.html for differences between empty and missing
-    gdf = gdf[gdf.geometry.notna()] # drop missing geometries
-    gdf = gdf[~gdf.geometry.is_empty] # drop empty geometries
-
-    gdf = gdf.drop_duplicates(subset=["adm4"]).reset_index(drop=True) # keep only distinct adm4 values
-
-    geojson = json.loads(gdf.to_json()) # converting geodataframe to geojson dict for choropleth plotting
-
-    return gdf, geojson # note that the cleaned-up gdf may or may not drop some regions
+    return boundary_index, geojson
 
 # function to load weather data from weather table
 def load_weather_data(start_time: pd.Timestamp, end_time: pd.Timestamp) -> pd.DataFrame:
@@ -133,60 +117,116 @@ def load_weather_data(start_time: pd.Timestamp, end_time: pd.Timestamp) -> pd.Da
     # convert to panda's datetime since the SQL's date is initially string
     df["local_datetime"] = pd.to_datetime(df["local_datetime"], errors="coerce") # output -> Series of datetime.datetime
 
-    for col in [
-        "adm4",
-        "desa_kelurahan",
-        "kecamatan",
-        "kota_kabupaten",
-        "risk_level",
-        "weather_desc",
-    ]:
-        df[col] = df[col].astype(str).str.strip() # remove trailing and leading whitespace for string columns
-
-    # drop NaN values for datetime columns
-    df = df.dropna(subset=["local_datetime"]).reset_index(drop=True)
-
     return df # comparing to the boundary table, the shared column is adm4
 
 # get unique timestamp values in weather data
-def available_times_in_data(df: pd.DataFrame) -> list[pd.Timestamp]:
-    return sorted(df["local_datetime"].dropna().unique().tolist()) # list of pd.Timestamp sorted
+def available_timestamps(start_time: pd.Timestamp, end_time: pd.Timestamp) -> list[pd.Timestamp]:
+    query = f"""
+        SELECT DISTINCT local_datetime
+        FROM {WEATHER_TABLE}
+        WHERE local_datetime >= '{start_time}'
+          AND local_datetime <= '{end_time}'
+        ORDER BY local_datetime
+    """
+    df = run_query(query)
 
-# get the nearest time in region filtered df to the current time
-def nearest_available_time_in_df(df: pd.DataFrame, current_time: pd.Timestamp):
-    times = available_times_in_data(df)
-    if not times:
-        return None
-
-    times = pd.to_datetime(pd.Series(times))
-    if times.empty:
-        return None
-
-    nearest_idx = (times - current_time).abs().idxmin()
-    return pd.Timestamp(times.loc[nearest_idx])
-
-# filtering region-filtered df to the selected time
-def weather_at_selected_time(df: pd.DataFrame, selected_time:pd.Timestamp) -> pd.DataFrame:
-    out = df[df["local_datetime"] == selected_time]
-    return out
-    # return (
-    #     out.sort_values(["kota_kabupaten", "kecamatan", "desa_kelurahan"])
-    #     .reset_index(drop=True)
-    # )
-
-# function to give available options for region filtering
-# for city-level, prior_mask must be None
-def region_filter_options(
-    df: pd.DataFrame,
-    column: str,
-    prior_mask: pd.Series | None = None,
-) -> list[str]:
-
-    subset = df if prior_mask is None else df[prior_mask]
-    if subset.empty:
+    if df.empty:
         return []
-    # subset = subset[column].apply(short_city_name)
-    return sorted(
-        subset[column].astype(str).str.strip().unique().tolist() # get only distinct values
-    )
+
+    return pd.to_datetime(df["local_datetime"]).tolist() # list of pd.Timestamp sorted
+
+# functions to get available options for region filtering
+def city_options() -> list[str]: # fory city-level
+    query = f"""
+        SELECT DISTINCT kota_kabupaten
+        FROM {WEATHER_TABLE}
+        WHERE kota_kabupaten IS NOT NULL
+          AND TRIM(kota_kabupaten) != ''
+        ORDER BY kota_kabupaten
+    """
+    df = run_query(query)
+    if df.empty:
+        return []
+    return df["kota_kabupaten"].astype(str).str.strip().tolist()
+def subdistrict_options(selected_city: str) -> list[str]: # for subdistrict-level
+    query = f"""
+        SELECT DISTINCT kecamatan
+        FROM {WEATHER_TABLE}
+        WHERE kota_kabupaten = '{selected_city}'
+          AND kecamatan IS NOT NULL
+          AND TRIM(kecamatan) != ''
+        ORDER BY kecamatan
+    """
+    df = run_query(query)
+    if df.empty:
+        return []
+    return df["kecamatan"].astype(str).str.strip().tolist()
+def ward_options(selected_city: str, selected_subdistrict: str) -> list[str]: # for ward-level
+    query = f"""
+        SELECT DISTINCT desa_kelurahan
+        FROM {WEATHER_TABLE}
+        WHERE kota_kabupaten = '{selected_city}'
+          AND kecamatan = '{selected_subdistrict}'
+          AND desa_kelurahan IS NOT NULL
+          AND TRIM(kecamatan) != ''
+        ORDER BY kecamatan
+    """
+    df = run_query(query)
+    if df.empty:
+        return []
+    return df["desa_kelurahan"].astype(str).str.strip().tolist()
+
+# function to get the region code for the selected region for filtering the database to the selected reigion
+def ward_final_selection(selected_city: str, selected_subdistrict: str, selected_ward: str) -> str | None:
+    query = f"""
+        SELECT adm4
+        FROM {WEATHER_TABLE}
+        WHERE kota_kabupaten = '{selected_city}'
+          AND kecamatan = '{selected_subdistrict}'
+          AND desa_kelurahan = '{selected_ward}'
+        ORDER BY local_datetime
+        LIMIT 1
+    """
+    df = run_query(query)
+    if df.empty:
+        return None
+    value = df.iloc[0]["adm4"] # get the code
+    return str(value).strip()
+
+# selecting rows with the filtered-region and (current) time
+def current_condition(adm4: str, current_time: pd.Timestamp) -> pd.DataFrame:
+    query = f"""
+        SELECT *
+        FROM {WEATHER_TABLE}
+        WHERE adm4 = '{adm4}'
+          AND local_datetime <= '{current_time.strftime("%Y-%m-%d %H:%M:%S")}'
+        ORDER BY local_datetime DESC
+        LIMIT 1
+    """
+    df = run_query(query)
+
+    if df.empty:
+        return df
+
+    df["local_datetime"] = pd.to_datetime(df["local_datetime"], errors="coerce")
+    return df
+
+# function to query future weather data relative to current time
+def future_forecast(adm4: str, current_time: pd.Timestamp, end_time: pd.Timestamp) -> pd.DataFrame:
+    query = f"""
+        SELECT *
+        FROM {WEATHER_TABLE}
+        WHERE adm4 = '{adm4}'
+          AND local_datetime BETWEEN '{current_time.strftime("%Y-%m-%d %H:%M:%S")}'
+                                AND '{end_time.strftime("%Y-%m-%d %H:%M:%S")}'
+        ORDER BY local_datetime
+    """
+    df = run_query(query)
+
+    if df.empty:
+        return df
+
+    df["local_datetime"] = pd.to_datetime(df["local_datetime"], errors="coerce")
+    return df
+
 

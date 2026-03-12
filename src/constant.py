@@ -4,6 +4,8 @@ BASE_DIR = Path(__file__).resolve().parents[1]
 DB_PATH = BASE_DIR / "tables" / "heat_risk.db"
 BOUNDARY_TABLE = "ward_boundary_table_simplified"
 WEATHER_TABLE = "ward_weather_table"
+CITY_SUMMARY_TABLE = "city_summary_table"
+BOUNDARY_GEOJSON_PATH = BASE_DIR / "tables" / "jakarta_boundary_simplified.geojson"
 
 RISK_ORDER = [
     "No Data",

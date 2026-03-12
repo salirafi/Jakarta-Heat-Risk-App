@@ -3,8 +3,8 @@ from plotly.subplots import make_subplots
 import pandas as pd
 import numpy as np
 
-from .helpers import format_timestamp, short_city_name
-from .constant import RISK_CODE_MAP, RISK_ORDER, RISK_COLOR_MAP, CITY_COLOR_MAP, CITY_ORDER
+from .helpers import format_timestamp, short_city_name, run_query
+from .constant import RISK_CODE_MAP, RISK_ORDER, RISK_COLOR_MAP, CITY_COLOR_MAP, CITY_ORDER, CITY_SUMMARY_TABLE, WEATHER_TABLE
 
 def build_map_figure(
     boundary_geojson: dict,
@@ -89,37 +89,24 @@ def make_discrete_colorscale():
         scale.append([end, color])
     return scale
 
-# function organizes forecast data by time, so we can quickly get the weather forecast for any specific timestamp
-# it converts a large table of forecasts into a dictionary lookup indexed by time
-def build_weather_data_lookup(weather_data: pd.DataFrame) -> dict[pd.Timestamp, pd.DataFrame]:
-
-    lookup = {}
-
-    # group based on time, no need sorting to improve performance
-    # order does not matter since the slicing is based on key value, not index
-    grouped = weather_data.groupby("local_datetime", sort=False)
-
-    for ts, group in grouped:
-        group = (
-            group.sort_values(["kota_kabupaten", "kecamatan", "desa_kelurahan"]) # just for clean ordering
-            .drop_duplicates(subset=["adm4"],keep="last") # may not be necessary since the original database -. one region has one timestamp at a time
-            .reset_index(drop=True)
-            .copy()
-        )
-        lookup[pd.Timestamp(ts)] = group
-    
-    return lookup # dictionary with time as keys and weather data as values
-
 # function to variable that contains colormap and metadata for choropleth plotting
 # this is made since the colormap is the slide-dependent component, not the boundary polygon data 
 def create_dynamic_colormap(
     boundary_index: pd.DataFrame,
-    weather_lookup: dict[pd.Timestamp, pd.DataFrame], # output of weather_data_lookup()
     selected_time: pd.Timestamp, # time selected from the slider
 ):
+    
+    selected_time = pd.to_datetime(selected_time)
+    
+    query = f"""
+        SELECT adm4, desa_kelurahan, kecamatan, kota_kabupaten,
+            local_datetime, heat_index_c, temperature_c, humidity_ptg, risk_level, weather_desc
+        FROM {WEATHER_TABLE}
+        WHERE local_datetime = '{selected_time}'
+        """
 
     index_df = boundary_index.copy() # dataframe for region/boundary index
-    time_df = weather_lookup.get(selected_time)
+    time_df = run_query(query)
 
     merged = index_df.merge(time_df, on="adm4", how="left") # merge based on region code adm4
     merged["risk_level"] = merged["risk_level"].fillna("No Data") # if no data on risk_level, fill with "No Data"
@@ -291,22 +278,19 @@ def build_city_summary_plot(
 # the summary dataframe is then converted to a dictionary of lists ordered by CITY_ORDER
 def city_summary_at_time(
     selected_time: pd.Timestamp,
-    weather_lookup: dict[pd.Timestamp, pd.DataFrame], # output of weather_data_lookup()
 ) -> dict[list]:
 
-    time_df = weather_lookup.get(selected_time) # dataframe at selected_time
+    selected_time = pd.to_datetime(selected_time)
     metric_cols = ["avg_temperature_c", "avg_humidity_ptg", "avg_heat_index_c"]
 
-    summary = (
-        time_df.groupby("kota_kabupaten", as_index=False) # group by cities' name
-        .agg( # perform aggregate function (mean) to each parameter for each city
-            avg_temperature_c=("temperature_c", "mean"),
-            avg_humidity_ptg=("humidity_ptg", "mean"),
-            avg_heat_index_c=("heat_index_c", "mean"),
-        )
-        .sort_values("kota_kabupaten") # sort for cleaner output
-        .reset_index(drop=True)
-    )
+    # query the average table
+    query = f"""
+        SELECT *
+        FROM {CITY_SUMMARY_TABLE}
+        WHERE local_datetime = '{selected_time}'
+        ORDER BY kota_kabupaten
+        """
+    summary = run_query(query)
 
     summary["city_short_name"] = summary["kota_kabupaten"].apply(short_city_name) # shorten city name to fit the plot neatly
     summary_map = summary.set_index("city_short_name")[metric_cols].to_dict(orient="index")
@@ -420,6 +404,17 @@ def build_heat_index_plot(
 def create_heat_index_arr(df: pd.DataFrame) -> dict:
 
     df = df.copy()
+
+    # to accommodate the state where the user change city and subdistrict (at which the brief state produces empty dataframe)
+    if df.empty:
+        return {
+            "x": [],
+            "y_hi": [],
+            "y_temp": [],
+            "y_range": [0, 1],
+            "is_empty": True,
+            
+        }
     df["local_datetime"] = pd.to_datetime(df["local_datetime"], errors="coerce")
 
     x_ = np.array(df["local_datetime"].dt.to_pydatetime()) # .to_pydatetime() returns datetime objects instead ndarray
