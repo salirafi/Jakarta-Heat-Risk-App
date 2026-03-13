@@ -34,7 +34,7 @@ Please note that the web app shows the weather forecast from roughly the user's 
 
 If the user wants to run [fetch_boundary_data.py](src/fetch_boundary_data.py), make sure they have downloaded the required .gdb file from [here](https://geoservices.big.go.id/portal/apps/webappviewer/index.html?id=cb58db080712468cb4bfd408dbde3d70).
 
-⚠️ **IMPORTANT!** ⚠️  This app is a personal project, so the code might not be optimized for smoother user's experience. For first time loading, the web might take a few seconds.
+⚠️ **IMPORTANT!** ⚠️  This app is a personal project for data analysis learning, so the BMKG API is not used directly in the app, but rather as database fetching. Also, code might not be optimized for smoother user's experience. For first time loading, the web might take a few seconds.
 
 ## Content
 
