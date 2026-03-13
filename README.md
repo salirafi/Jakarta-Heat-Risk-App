@@ -44,7 +44,7 @@ If the user wants to run [fetch_boundary_data.py](src/fetch_boundary_data.py), m
 
 ## Content
 
-This project depends heavily on [pandas](https://pandas.pydata.org/), with data managed in [SQLite](https://sqlite.org/) environment, though no SQLite broswer needs to be installed since all interface is done with Python.
+This project depends heavily on [pandas](https://pandas.pydata.org/) and [SQLite](https://sqlite.org/) environment, though no SQLite broswer needs to be installed since all interface is done with Python.
 
 [fetch](fetch) contains source code for fetching BMKG data ([fetch_weather_data.py](fetch/fetch_weather_data.py)), retrieving region code from [public API](https://wilayah.id/api) ([build_jakarta_preference.py](fetch/build_jakarta_preference.py)), and reading the boundary polygons from RBI data provided by Badan Informasi Geospasial ([fetch_boundary_data.py](fetch/fetch_boundary_data.py)). The first and last file create SQLite tables with names `ward_weather_table` and `ward_boundary_table` (and a GeoJSON), respectively, whilst the region code is saved as `jakarta_preference.csv`. Note that the only time-dependent data in this repository is the BMKG weather data, so the boundary polygon and region code will always be valid.
 
