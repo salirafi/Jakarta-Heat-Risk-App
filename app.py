@@ -4,738 +4,863 @@ Note that the pipeline of the code, in default, does not allow outputs of past w
 This can be changed by changing current_time variable, but note that the definition of 'current time' will not mean the present time anymore.
 '''
 
-from shiny import ui, App, reactive, render
-from shinywidgets import output_widget, render_widget
+from dash import Dash, html, dcc, Input, Output, State, ctx
 import pandas as pd
-from html import escape
 import sqlite3
 
-from src.constant import BASE_DIR, DB_PATH, BOUNDARY_TABLE, WEATHER_TABLE, CITY_ORDER, HEAT_RISK_GUIDE
+from src.constant import (
+    DB_PATH,
+    RISK_COLOR_MAP,
+    HEAT_RISK_GUIDE,
+    WEATHER_ICON_MAP,
+    RISK_ABBR,
+    WEATHER_TABLE,
+)
 from src.helpers import *
 from src.plotting import *
 
-# load data
 boundary_json = load_boundary_data() # pd.DataFrame and JSON dict
+current_time = pd.Timestamp.now(tz="Asia/Jakarta").tz_localize(None) # definition of current_time
 
-# definition of current_time
-current_time = pd.Timestamp.now(tz="Asia/Jakarta").tz_localize(None)
+app = Dash(__name__, suppress_callback_exceptions=True)
 
-app_ui = ui.page_fluid(
+# helper to make the header section
+def make_header(pathname="/location"):
 
-    # ui.tags.link(href="styles.css", rel="stylesheet"),
-    ui.head_content(ui.include_css(BASE_DIR / "styles.css")),
+    # divide the app into two pages
+    location_active = "nav-btn active" if pathname in ["/", "/location"] else "nav-btn"
+    map_active = "nav-btn active" if pathname == "/map" else "nav-btn"
 
-    ui.div(
-        ui.div("Jakarta's Heat Risk Map and Forecast", class_="page-title"),
-        ui.div("Heat index and risk information throughout Jakarta region based on BMKG data.", class_="page-subtitle"),
-        class_="title-block"
-    ),
+    return html.Div(
+        className="top-header",
+        children=[
 
-    ui.layout_columns(
-        ui.div(
-            ui.div(
-                ui.h2("Current Weather and Forecast", class_="panel-title"),
-                ui.layout_columns(
-                    ui.output_ui("city_ui"),
-                    ui.output_ui("subdistrict_ui"),
-                    ui.output_ui("ward_ui"),
-                    col_widths=[4, 4, 4],
-                ),
-                ui.output_ui("current_time_caption"),
-                ui.output_ui("current_metrics_ui"),
-                # ui.output_ui("test"),
-                ui.hr(style="margin: 1rem 0 0.8rem 0;"),
-                # ui.h3("Future forecast", class_="panel-subtitle"),
-                ui.output_ui("future_forecast_caption"),
-                ui.output_ui("future_forecast_cards_ui"),
-                # ui.hr(style="margin: 1rem 0 0.8rem 0;"),
-                ui.div(
-                    # ui.output_ui("heat_evolution_caption"),
-                    output_widget("heat_index_evolution_plot"),
-                    ui.p(f"*Gap between heat index and temperature shows how humid it is.", class_="heat-index-note"),
-                    class_="heat-index-section",
-                ),
-                class_="panel-box right-panel-box",
+            html.Div(
+                className="header-left",
+                children=[
+                    html.Div("Jakarta Heat Risk Information", className="app-title"),
+                ],
             ),
-            class_="main-panel",
-        ),
-        ui.div(
-            ui.div(
-                ui.h2("Heat Risk Map", class_="panel-title"),
-                ui.output_ui("time_slider_ui"),
-                output_widget("heat_risk_map"),
-                ui.output_ui("map_legend"),
-                ui.hr(style="margin: 0.8rem 0 0.8rem 0;"),
-                ui.div(
-                    ui.h3("Average conditions across Jakarta cities", class_="panel-subtitle"),
-                    ui.p("Averaged across all wards within each city at the selected map time.", class_="city-summary-note"),
-                    output_widget("city_summary_plot"),
-                    class_="city-summary-section"
-                ),
-                class_="panel-box left-panel-box",
+
+            html.Div(
+                className="header-nav",
+                children=[
+                    dcc.Link("Ward Info", href="/location", className=location_active),
+                    dcc.Link("Regional Info", href="/map", className=map_active),
+                ],
             ),
-            class_="main-panel",
-        ),
-        col_widths=[6, 6],
-        class_="main-panels",
-    ),
 
-    ui.div(
-        ui.output_ui("heat_risk_guide_ui"),
-        style="margin-top: 1rem;",
-    ),
-
-    ui.output_ui("reference_ui"),
-
-    ui.div(
-            ui.hr(style="margin: 0.2rem 0 0.7rem 0;"),
-            ui.div("© Sayyed Ali Rafi", class_="footer-text"),
-            ui.div("e-mail: salirafi8@gmail.com | GitHub: ",
-                    ui.a("salirafi",href="https://github.com/salirafi",target="_blank", class_='footer-text'),
-                class_="footer-text"),
-            
-            class_="footer-section",
-        )
-)
-
-def server(input, output, session):
-
-    conn = sqlite3.connect(DB_PATH)
-
-    # setting default query time window from current system's time to a day after; UTC+7
-    #!!!!!!!!!!!!!!!! IMPORTANT !!!!!!!!!!!!!!!
-    # this pipeline assumes that the 'current time' is the start_time (which defaults to the user's current system time)
-    query_window = reactive.Value({"start_time": current_time, # reactive value used; when it changes, all process downstreams invalidated
-                                    "end_time": current_time + pd.Timedelta(days=1.0)
-                                    })
-
-    @reactive.calc
-    def db_time_coverage(): # function to check current user's time to database time coverage
-
-        # check if database exists
-        if not DB_PATH.exists():
-            return {"status": "missing_db"}
-
-        # check if table exists
-        existing_tables = set(get_table_names(conn))
-        if BOUNDARY_TABLE not in existing_tables:
-            return {"status": "missing_boundary_table"}
-        if WEATHER_TABLE not in existing_tables:
-            return {"status": "missing_weather_table"}
-
-        try:
-            # getting min max time from database to # check if user's time is outside the range of database timestamp coverage
-            with sqlite3.connect(DB_PATH) as conne:
-                row = pd.read_sql_query(
-                    f"""
-                    SELECT
-                        MIN(local_datetime) AS min_ts,
-                        MAX(local_datetime) AS max_ts
-                    FROM {WEATHER_TABLE}
-                    """,
-                    conne,
-                ).iloc[0]
-
-            min_ts = pd.to_datetime(row["min_ts"])
-            max_ts = pd.to_datetime(row["max_ts"])
-
-            if pd.isna(min_ts) or pd.isna(max_ts):
-                return {"status": "empty_weather_table"}
-
-            now_local = pd.to_datetime(current_time)
-
-            return {
-                "status": "ok",
-                "min_ts": min_ts,
-                "max_ts": max_ts,
-                "now": now_local,
-                "is_outdated": now_local + pd.Timedelta(hours=3.0) < min_ts or now_local > max_ts,
-            }
-
-        except Exception as e:
-            return {"status": "error", "message": str(e)}
-
-    @reactive.effect
-    def _show_blocking_db_update_modal(): # immediate reactive effect when the system has checked the time
-        info = db_time_coverage()
-
-        status = info.get("status")
-
-        if status == "ok" and not info.get("is_outdated", False):
-            return
-
-        if status == "ok":
-            body = ui.div(
-                ui.h3("Database update required"),
-                ui.p(
-                    "The app's current Jakarta time is outside the timestamp range covered by the database."
-                ),
-                ui.p(
-                    f"Database coverage: {info['min_ts']} to {info['max_ts']} WIB"
-                ),
-                ui.p(
-                    f"Current time: {info['now']} WIB"
-                ),
-                ui.p("Please rebuild or update the database first, then reload this page. Check the ",
-                    ui.a("Github repo",href="https://github.com/salirafi",target="_blank", class_='footer-text'),
-                    " to see how to update.",
-                ),
+            html.Div(
+                [
+                    html.Div("Database last updated", className="header-update-label"),
+                    html.Div(get_last_db_update(), className="header-update-time"),
+                ],
+                className="header-right",
             )
-        elif status == "missing_db":
-            body = ui.div(
-                ui.h3("Database not found"),
-                ui.p("The file 'heat_risk.db' was not found."),
-                ui.p("Please rebuild or update the database first, then reload this page. Check the ",
-                    ui.a("Github repo",href="https://github.com/salirafi",target="_blank", class_='footer-text'),
-                    " to see how to update.",
-                ),
-            )
-        elif status == "missing_boundary_table":
-            body = ui.div(
-                ui.h3("Database incomplete"),
-                ui.p(f"Table '{BOUNDARY_TABLE}' was not found."),
-                ui.p("Please rebuild or update the database first, then reload this page. Check the ",
-                    ui.a("Github repo",href="https://github.com/salirafi",target="_blank", class_='footer-text'),
-                    " to see how to update.",
-                ),
-            )
-        elif status == "missing_weather_table":
-            body = ui.div(
-                ui.h3("Database incomplete"),
-                ui.p(f"Table '{WEATHER_TABLE}' was not found."),
-                ui.p("Please rebuild or update the database first, then reload this page. Check the ",
-                    ui.a("Github repo",href="https://github.com/salirafi",target="_blank", class_='footer-text'),
-                    " to see how to update.",
-                ),
-            )
-        elif status == "empty_weather_table":
-            body = ui.div(
-                ui.h3("Weather database is empty"),
-                ui.p("No weather timestamps are available."),
-                ui.p("Please rebuild or update the database first, then reload this page. Check the ",
-                    ui.a("Github repo",href="https://github.com/salirafi",target="_blank", class_='footer-text'),
-                    " to see how to update.",
-                ),
-            )
-        else:
-            body = ui.div(
-                ui.h3("Database check failed"),
-                ui.p(info.get("message", "Unknown error.")),
-                ui.p("Please rebuild or update the database first, then reload this page. Check the ",
-                    ui.a("Github repo",href="https://github.com/salirafi",target="_blank", class_='footer-text'),
-                    " to see how to update.",
-                ),
-            )
+        ],
+    )
 
-        modal = ui.modal(
-            body,
-            title=None,
-            easy_close=False,
-            footer=None,
-        )
-        ui.modal_show(modal)
+# get the nearest available time in the database from the current time
+def get_nearest_current_time_from_store(times_data):
+    times = deserialize_timestamps(times_data)
+    if not times:
+        return None
 
-    @reactive.calc
-    def forecast_times():
-        window = query_window.get()
-        start_time = pd.to_datetime(window.get("start_time")) - pd.Timedelta(hours=3.0) # add some margin for boundary timestamps
-        end_time = pd.to_datetime(window.get("end_time")) + pd.Timedelta(hours=3.0)
-        return available_timestamps(start_time, end_time, conn) # output all available timestamps from the data given the range
-    
-    # create map figure
-    @render_widget
-    def heat_risk_map():
+    times_series = pd.Series(times)
+    nearest_idx = (times_series - current_time).abs().idxmin()
+    return pd.Timestamp(times_series.loc[nearest_idx])
 
-        times = forecast_times() # list of unique timestamps in data["weather_df"]
-        if not times:
-            return ui.div("No available data", class_='city-summary-note')
-        selected_time = times[int(len(times)/2)] # initial average value for first timestamp
+# default queried database has time coverage of 1 day
+def get_default_query_window():
+    return {
+        "start_time": current_time,
+        "end_time": current_time + pd.Timedelta(days=1.0),
+    }
 
-        # slicing created grouped dictionary at selected_time
-        colormap = create_dynamic_colormap(
-            # boundary_index=boundary_index,
-            selected_time=selected_time,
-            conn=conn,
-        )
+# get the available timestamps from the queried window
+def load_forecast_times():
+    window = get_default_query_window()
 
-        return build_map_figure(
-                boundary_geojson=boundary_json,
-                locations=colormap["customdata"][:,-1].tolist(),
-                colormap=colormap,
-            )
-    
-    # update the map based on selected slider time
-    @reactive.effect
-    def _update_map_in_place():
+    # 3 hours offset to start_time is ti include the timestamp corresponds to the exact current time
+    # if no offset, the earliest timestamp queried will be AFTER the current time
+    start_time = pd.to_datetime(window["start_time"]) - pd.Timedelta(hours=3.0)
+    end_time = pd.to_datetime(window["end_time"]) + pd.Timedelta(hours=3.0)
 
-        selected_time =  pd.Timestamp(input.selected_time())
-        if selected_time is None:
-            return
+    conn = get_conn()
+    try:
+        times = available_timestamps(start_time, end_time, conn)
+    finally:
+        conn.close()
 
-        # slicing created grouped dictionary at selected_time
-        colormap = create_dynamic_colormap(
-            # boundary_index=boundary_index,
-            selected_time=selected_time,
-            conn=conn,
-        )
+    return times
 
-        widget = heat_risk_map.widget
-        widget = getattr(heat_risk_map, "widget", None)
-        if widget is None or not widget.data:
-            return
+# query weather data of current time and selected location
+def load_current_snapshot_df(selected_ward, times_data):
+    if not selected_ward:
+        return pd.DataFrame()
 
-        # update the color map but the boundary polygon stays
-        widget.data[0].z = colormap["z"]
-        widget.data[0].customdata = colormap["customdata"]
+    nearest_time = get_nearest_current_time_from_store(times_data)
+    if nearest_time is None:
+        return pd.DataFrame()
 
-    # create city summary plot
-    @render_widget
-    def city_summary_plot():
-
-        times = forecast_times() # list of unique timestamps in data["weather_df"]
-        if not times:
-            return ui.div("No available data", class_='city-summary-note')
-
-        initial_summary = city_summary_at_time(
-                            selected_time=times[int(len(times)/2)], # initial average value for first timestamp
-                            conn=conn,
-                            )
-
-        return build_city_summary_plot(
-                summary_value=initial_summary,
-            )
-    
-    # update the city summary plot on selected slider time
-    @reactive.effect
-    def _update_city_summary_in_place():
-
-        selected_time =  pd.Timestamp(input.selected_time())
-
-        # slicing created grouped dictionary at selected_time
-        timestamp_summary = city_summary_at_time(
-                            selected_time=selected_time, # initial average value for first timestamp
-                            conn=conn,
-                            )
-
-        widget = getattr(city_summary_plot, "widget", None)
-        if widget is None or not widget.data:
-            return
-
-        # update the color map but the boundary polygon stays
-        trace_idx = 0
-        metric_cols = ["avg_temperature_c", "avg_humidity_ptg", "avg_heat_index_c"]
-        timestamp_customdata = [[timestamp_summary["local_datetime"]] for _ in CITY_ORDER]
-        for metric_col in metric_cols:
-            widget.data[trace_idx].customdata = timestamp_customdata
-            widget.data[trace_idx].y = timestamp_summary[metric_col]
-            trace_idx += 1
-
-    @output
-    @render.ui
-    def map_legend():
-        return ui.div(
-            ui.HTML(legend_html()), # creating map legend
-            class_="legend-row"
-        )
-
-    @output
-    @render.ui
-    def time_slider_ui(): # UI for time slider
-
-        times = forecast_times() # list of unique timestamps in data["weather_df"]
-        if not times:
-            return ui.div("No available data", class_='city-summary-note')
-        step = pd.Timedelta(hours=3) # since the data is in 3-hourly basis
-
-        return  ui.div(
-            ui.input_slider(
-                "selected_time",
-                None,
-                min=times[0],
-                max=times[-1],
-                value=times[int(len(times)/2)],
-                step=step,
-                ticks=False,
-                width="100%",
-                time_format="%b %d %Y, %H:%M",
-                timezone="+0000",
-            ),
-            ui.output_ui("selected_map_time_text"), # showing the selected time from the slider
-        )
-
-    @output
-    @render.ui
-    def selected_map_time_text():
-
-        selected = input.selected_time()
-
-        selected_time = pd.Timestamp(selected).strftime("%b %d %Y, %H:%M")
-        return ui.div(
-            f"Map time: {selected_time} WIB",
-            class_="map-time-caption"
-        )
-
-    @output
-    @render.ui
-    def city_ui():
-        choices = city_options(conn) # for city-level, no prior_mask
-        return ui.div(
-            ui.input_select(
-                "selected_city",
-                "City",
-                choices=choices,
-                selected=choices[0] if choices else None, # if user does not select, default is the top option
-            ),
-            class_="filter-block"
-        )
-
-    @output
-    @render.ui
-    def subdistrict_ui():
-        selected_city = input.selected_city()
-        if not selected_city:
-            choices = []
-        else:
-            choices = subdistrict_options(selected_city, conn)
-        return ui.div(
-            ui.input_select(
-                "selected_subdistrict",
-                "Subdistrict",
-                choices=choices,
-                selected=choices[0] if choices else None, # if user does not select, default is the top option
-            ),
-            class_="filter-block"
-        )
-
-    @output
-    @render.ui
-    def ward_ui(): 
-        selected_city = input.selected_city()
-        selected_subdistrict = input.selected_subdistrict()
-        if selected_city and selected_subdistrict:
-            choices = ward_options(selected_city, selected_subdistrict, conn)
-        else:
-            choices = []
-        return ui.div(
-            ui.input_select(
-                "selected_ward",
-                "Ward",
-                choices=choices,
-                selected=choices[0] if choices else None, # if user does not select, default is the top option
-            ),
-            class_="filter-block"
-        )
-
-    @ reactive.calc
-    def current_time_for_metrics(): # get the nearest time in region filtered df to the current time
-        times = pd.Series(forecast_times()) # convert list[pd.Timestamp] to pd.Series
-        nearest_idx = (times - current_time).abs().idxmin()
-        return pd.Timestamp(times.loc[nearest_idx])
-
-    @reactive.calc
-    def current_snapshot(): # get the weather data for selected region and time
-        region_code = ward_final_selection(input.selected_city(), 
-                                           input.selected_subdistrict(), 
-                                           input.selected_ward(),
-                                           conn,
-                                           )
-        current_time_df = current_time_for_metrics()
-        return current_condition( # this ideally should output a database with only one row since timestamp and region code are the unique parameters
-            region_code,
-            current_time_df,
+    conn = get_conn()
+    try:
+        # this ideally should output only a single row 
+        # since combination of code and timestamp is unique
+        df_region = pd.read_sql_query(
+            f"""
+            SELECT adm4
+            FROM {WEATHER_TABLE}
+            WHERE desa_kelurahan = ?
+            LIMIT 1
+            """,
             conn,
-            )
+            params=[selected_ward],
+        )
 
-    @output
-    @render.ui
-    def current_time_caption():
-        current_time_caption = current_time.strftime("%B %d %Y, %H:%M")
-        current_time_df = current_time_for_metrics()
-        current_time_df = current_time_df.strftime("%B %d %Y, %H:%M")
+        if df_region.empty:
+            return pd.DataFrame()
 
-        return ui.div(
-            ui.div(f"Current Jakarta time: {current_time_caption} WIB", class_="current-time-caption"),
-            ui.div(f"Actual data shown is at time: {current_time_df} WIB", class_="city-summary-note"),
-            # ui.div(f"{forecast_times()}") # debug check
-            )
+        region_code = df_region.iloc[0]["adm4"]
 
-    @output
-    @render.ui
-    def current_metrics_ui():
+        snap = current_condition(
+            region_code,
+            nearest_time,
+            conn,
+        )
+    finally:
+        conn.close()
 
-        snap = current_snapshot()
-        if snap.empty:
-            return ui.div("No data for the selected region and time.", class_="city-summary-note")
+    return snap
 
-        html = "".join([
-            metric_card_html("Temperature", f"{snap['temperature_c'].iloc[0]:.1f} °C"),
-            metric_card_html("Humidity", f"{snap['humidity_ptg'].iloc[0]:.1f} %"),
-            metric_card_html("Heat Index", f"{snap['heat_index_c'].iloc[0]:.1f} °C"),
-            metric_card_html("Risk Level", f"{snap['risk_level'].iloc[0]}", extra_class="metric-card-weather"),
-            metric_card_html("Weather", f"{snap['weather_desc'].iloc[0]}", extra_class="metric-card-weather"),
-        ])
+# get data for evolution plot
+def load_heat_index_evolution_values(selected_ward, times_data):
+    df = load_future_forecast_df(selected_ward, times_data)
+    if df.empty:
+        return None
 
-        return ui.div(ui.HTML(html), class_="metric-grid metric-grid-5")
+    return create_heat_index_arr(df) # create the suitable array structure for plotting
 
-    @output
-    @render.ui
-    def future_forecast_caption():
-        return ui.h3(f"Future forecast at {input.selected_ward()}", class_="panel-subtitle"),
-    
-    @reactive.calc
-    def future_forecast_df(): # getting weather data after current time at selected region
-        selected_city = input.selected_city()
-        selected_subdistrict = input.selected_subdistrict()
-        selected_ward = input.selected_ward()
+# load future forecast dataframe for a selected ward between nearest current forecast time and the query window end time
+def load_future_forecast_df(selected_ward, times_data):
+    if not selected_ward:
+        return pd.DataFrame()
 
-        if not (selected_city and selected_subdistrict and selected_ward):
-            return pd.DataFrame() # to guard brief state between changin city and subdistrict
-        
-        region_code = ward_final_selection(selected_city, 
-                                        selected_subdistrict, 
-                                        selected_ward,
-                                        conn,
-                                        )
-        
-        if region_code is None:
-            return pd.DataFrame() # to guard brief state between changin city and subdistrict
-        
-        current_time_df = current_time_for_metrics() # as starting time
-        end_time = query_window.get().get("end_time")
-        return future_forecast( # return pd.DataFrame for all rows of selected regions after the current time
+    # this df will correspond to the nearest future timestamp to current time
+    current_time_df = get_nearest_current_time_from_store(times_data)
+    if current_time_df is None:
+        return pd.DataFrame()
+
+    end_time = get_default_query_window()["end_time"] # plus 1-day (default) from start_time
+
+    conn = get_conn()
+    try:
+        df_region = pd.read_sql_query(
+            f"""
+            SELECT adm4
+            FROM {WEATHER_TABLE}
+            WHERE desa_kelurahan = ?
+            LIMIT 1
+            """,
+            conn,
+            params=[selected_ward],
+        )
+
+        if df_region.empty:
+            return pd.DataFrame()
+
+        region_code = df_region.iloc[0]["adm4"]
+
+        df = future_forecast( # do SQL query to retrieve time, HI, risk level, and ward
             region_code,
             current_time_df,
             end_time,
             conn,
-            )
+        )
+    finally:
+        conn.close()
 
-    @output
-    @render.ui
-    def future_forecast_cards_ui():
-        df = future_forecast_df()
+    return df
 
-        if df.empty:
-            return ui.div("No available data.", class_="city-summary-note") # to guard brief state between changin city and subdistrict
+# creating the future forecast cards
+def build_forecast_cards(df):
+    if df.empty:
+        return html.Div("No available data.", className="city-summary-note")
 
-        cards = []
-        for ward_, hi_, risk_, ts_ in zip( # note: not using iterrows() due to slow performance
-            df["desa_kelurahan"],
-            df["heat_index_c"],
-            df["risk_level"],
-            df["local_datetime"],
-        ):
+    cards = []
 
-            bg_color = hex_to_rgba_css(RISK_COLOR_MAP.get(risk_, "#dcdcdc"), alpha=0.18)
-            cards.append(
-                f"""
-                <div class="forecast-card" style="background:{bg_color};">
-                    <div class="forecast-card-title">{escape(str(ward_))}</div>
-                    <div class="forecast-card-hi">{"HI"}: {hi_:.1f} °C</div>
-                    <div class="forecast-card-risk">{escape(risk_badge(risk_))}</div>
-                    <div class="forecast-card-time">
-                        {pd.Timestamp(ts_)}
-                    </div>
-                </div>
-                """
-            )
+    wards = df["desa_kelurahan"]
+    times = df["local_datetime"]
+    heat_index = df["heat_index_c"]
+    risks = df["risk_level"]
 
-        return ui.div(ui.HTML("".join(cards)), class_="forecast-scroll")
+    for ward, ts_, hi_, risk_ in zip(wards, times, heat_index, risks):
 
-    # @output
-    # @render.ui
-    # def heat_evolution_caption():
-    #     return ui.h3(f"Future forecast at {input.selected_ward()} in graph", class_="panel-subtitle"),
-
-    @render_widget
-    def heat_index_evolution_plot():
-        
-        # set initial region for creating plot
-        region_code = ward_final_selection("Kota Adm. Jakarta Barat", 
-                                "Cengkareng", 
-                                "Cengkareng Barat",
-                                conn,
-                                )
-        current_time_df = current_time_for_metrics() # as starting time
-        end_time = query_window.get().get("end_time")
-        
-        df = future_forecast(region_code, current_time_df, end_time, conn)
-        evolution_values = create_heat_index_arr(df)
-
-        return build_heat_index_plot(
-            evolution_values=evolution_values,
+        #  color the cards' background to the risk level
+        bg_color = hex_to_rgba_css(
+            RISK_COLOR_MAP.get(risk_, "#dcdcdc"),
+            alpha=0.18,
         )
 
-    # @render.ui
-    # def test():
-    #     snap = current_snapshot()
-    #     return ui.div(
-    #         ui.p(f"{snap['temperature_c']}"),
-    #         ui.p(f"{snap['humidity_ptg']}"),
-    #         ui.p(f"{snap['heat_index_c']}"),
-    #         )
-
-    # update the plot based on selected region
-    @reactive.effect
-    def _update_heat_index_plot_in_place():
-
-        df = future_forecast_df()
-        evolution_values = create_heat_index_arr(df)
-
-        widget = heat_index_evolution_plot.widget
-
-        widget = getattr(heat_index_evolution_plot, "widget", None)
-        if widget is None or len(widget.data) < 2:
-            return
-
-        # update the color map but the boundary polygon stays
-        widget.data[0].x = evolution_values["x"]
-        widget.data[0].y = evolution_values["y_hi"]
-
-        widget.data[1].x = evolution_values["x"]
-        widget.data[1].y = evolution_values["y_temp"]
-
-        # update range as well
-        widget.layout.yaxis.range = evolution_values["y_range"]
-
-    @output
-    @render.ui
-    def heat_risk_guide_ui(): # for heat risk guide section
-
-        levels = ["Lower Risk", "Caution", "Extreme Caution", "Danger", "Extreme Danger"]
-
-        return ui.div(
-            ui.h4("Heat Risk Guide", class_="panel-title"),
-            ui.p("Click a heat risk level below to see what it means and what actions to take. This guide is based on the ",
-                ui.a(
-                    "U.S. National Weather Service HeatRisk Guide",
-                    href="https://www.wpc.ncep.noaa.gov/heatrisk/",
-                    target="_blank"
+        card = html.Div(
+            className="forecast-card",
+            style={"background": bg_color},
+            children=[
+                html.Div(str(ward), className="forecast-card-title"),
+                html.Div(
+                    pd.Timestamp(ts_).strftime("%b %d, %H:%M"),
+                    className="forecast-card-time",
                 ),
-                ".",
-                class_="caption risk-guide-intro"
-            ),
-            ui.div(
-                *[
-                    ui.input_action_button(
-                        guide_button_id(level),
-                        label="",
-                        icon=None,
-                        class_="risk-guide-item-btn",
-                    )
-                    for level in levels
+                html.Div(f"HI: {hi_:.1f} °C", className="forecast-card-hi"),
+                html.Div(risk_badge(risk_), className="forecast-card-risk"),
+            ],
+        )
+
+        cards.append(card)
+
+    return html.Div(cards, className="forecast-scroll")
+
+def build_map_legend():
+    return html.Div(
+        className="legend-container",
+        children=[
+            html.Div(
+                className="legend-item",
+                children=[
+                    html.Div(
+                        className="legend-color",
+                        style={"backgroundColor": color},
+                    ),
+                    html.Span(label, className="legend-label"),
                 ],
-                class_="risk-guide-list-hidden-inputs",
+            )
+            for label, color in RISK_COLOR_MAP.items()
+        ],
+    )
+
+# options to be displayed to the search bar
+# all available wards will be listed
+options = make_ward_search_options(get_conn())
+
+def build_metric_card(label, value, extra_class=""):
+    class_name = "metric-card"
+    if extra_class:
+        class_name += f" {extra_class}"
+
+    return html.Div(
+        className=class_name,
+        children=[
+            html.Div(label, className="metric-label"),
+            html.Div(value, className="metric-value"),
+        ],
+    )
+
+# function to construct the heat risk guide section
+def build_heat_risk_guide_component():
+    levels = ["Lower Risk", "Caution", "Extreme Caution", "Danger", "Extreme Danger"]
+
+    return html.Div(
+        children=[
+            html.H3("Heat Risk Guide", className="left-title"),
+            html.P(
+                [
+                    "Guide to what it means and what actions to take. Based on ",
+                    html.A(
+                        "U.S. National Weather Service",
+                        href="https://www.wpc.ncep.noaa.gov/heatrisk/",
+                        target="_blank",
+                    ),
+                    ".",
+                ],
+                className="left-paragraph risk-guide-intro",
             ),
-            ui.div(
-                *[
-                    ui.tags.button(
-                        ui.tags.span(
-                            ui.tags.span(
-                                ui.tags.span(
-                                    "",
-                                    class_="risk-guide-dot",
-                                    style=f"background:{RISK_COLOR_MAP[level]};"
-                                ),
-                                ui.tags.span(level, class_="risk-guide-item-title"),
-                                class_="risk-guide-item-left",
+            html.Div(
+                className="guide-button-list",
+                children=[
+                    html.Button(
+                        [
+                            html.Span(
+                                className="risk-guide-item-left",
+                                children=[
+                                    html.Span(
+                                        "",
+                                        className="risk-guide-dot",
+                                        style={"background": RISK_COLOR_MAP[level]},
+                                    ),
+                                    html.Span(level, className="risk-guide-item-title"),
+                                ],
                             ),
-                            ui.tags.span("View", class_="risk-guide-item-right"),
-                            class_="risk-guide-item-inner",
-                        ),
-                        id=f"{guide_button_id(level)}_proxy",
-                        class_="risk-guide-item",
-                        type="button",
-                        onclick=f"document.getElementById('{guide_button_id(level)}').click();",
+                            html.Span("View", className="risk-guide-item-right"),
+                        ],
+                        id=f"guide-btn-{idx}",
+                        className="guide-btn risk-guide-item",
                     )
-                    for level in levels
+                    for idx, level in enumerate(levels, start=1)
                 ],
-                class_="risk-guide-list",
             ),
+        ]
+    )
+
+# ====================
+# LAYOUT-RELATED
+# ====================
+
+def location_layout():
+    return html.Div(
+        className="right-column",
+        children=[
+            html.Div(
+                className="location-panel",
+                children=[
+                    html.Div(
+                        className="location-panel-body",
+                        children=[
+                            html.Div(
+                                className="search-row",
+                                children=[
+                                    html.Div(
+                                        id="current_snapshot_time_text",
+                                        className="search-time-meta-slot",
+                                    ),
+                                    html.Div(
+                                        className="search-dropdown-wrap",
+                                        children=[
+                                            dcc.Dropdown(
+                                                id="selected_ward_search",
+                                                options=options,
+                                                placeholder="Search ward...",
+                                                searchable=True,
+                                                clearable=True,
+                                                className="search-dropdown",
+                                            ),
+                                            # html.Div(
+                                            #     id="current_snapshot_time_text",
+                                            #     className="search-time-meta-slot",
+                                            # ),
+                                        ],
+                                    ),
+                                    html.Div(className="search-row-spacer"),
+                                ],
+                            ),
+
+                            html.Div(id="location_content_ui", className="location-panel-body"),
+                        ],
+                    ),
+                ],
+            ),
+        ],
+    )
+
+def map_layout():
+    return html.Div(
+        className="right-column right-column-map",
+        children=[
+            html.Div(
+                className="map-panel",
+                children=[
+                    html.Div(
+                        className="map-slider-row",
+                        children=[
+                            html.Div(id="selected_map_time_text", className="map-time-caption"),
+                            html.Div(
+                                className="map-slider-control",
+                                children=[
+                                    dcc.Slider(
+                                        id="selected_time_idx",
+                                        min=0,
+                                        max=0,
+                                        step=1,
+                                        value=0,
+                                        marks={},
+                                        allow_direct_input=False,
+                                    ),
+                                ],
+                            ),
+                        ],
+                    ),
+                    html.Div(
+                        className="map-content-row",
+                        children=[
+                            html.Div(
+                                className="map-section",
+                                children=[
+                                    dcc.Graph(
+                                        id="heat_risk_map",
+                                        figure={},
+                                        config={"displayModeBar": False},
+                                        style={"height": "100%", "width": "100%"},
+                                    ),
+                                    html.Div(id="map_legend", className="legend-row"),
+                                ],
+                            ),
+                            html.Div(
+                                className="map-section",
+                                children=[
+                                    # html.Div(
+                                    #     "Regional Summary",
+                                    #     className="city-summary-header"
+                                    # ),
+
+                                    html.Div(
+                                        className="city-summary-center",
+                                        children=[
+                                            dcc.Graph(
+                                                id="city_summary_plot",
+                                                figure={},
+                                                config={"displayModeBar": False},
+                                            ),
+                                        ],
+                                    ),
+                                ],
+                            )
+                        ],
+                    ),
+                ],
+            ),
+        ],
+    )
+
+def build_empty_location_state():
+    return html.Div(
+        "Please select location to display.",
+        className="location-empty-state",
+    )
+
+def build_location_content_layout():
+    return [
+        html.Div(id="current_metrics_ui", className="card-row"),
+
+        html.Div(
+            className="location-section",
+            children=[
+                # html.Div(id="future_forecast_caption", className="section-title"),
+                html.Div(
+                    id="future_forecast_cards_ui",
+                    className="section-content",
+                ),
+            ],
+        ),
+
+        html.Div(
+            className="location-section",
+            children=[
+                html.Div(
+                    className="section-content heat-index-section",
+                    children=[
+                        dcc.Graph(
+                            id="heat_index_evolution_plot",
+                            figure={},
+                            config={"displayModeBar": False},
+                            style={"height": "100%", "width": "100%"},
+                        ),
+                        html.Div(
+                            "*Gap between heat index and temperature shows how humid it is.",
+                            className="heat-index-note",
+                        ),
+                    ],
+                ),
+            ],
+        ),
+    ]
+
+app.layout = html.Div(
+    className="app-shell",
+    children=[
+        dcc.Location(id="url"),
+        dcc.Store(id="forecast-times-store"),
+        html.Div(id="header-container"),
+
+        html.Div(
+            className="page-body",
+            children=[
+
+                # LEFT PANEL
+                html.Div(
+                    className="left-column",
+                    children=[
+                        html.Div(
+                            className="left-panel",
+                            children=[
+                                build_heat_risk_guide_component(),
+
+                                html.Hr(className="left-divider"),
+
+                                html.H4("About", className="left-subtitle"),
+
+                                dcc.Markdown("""                                                        
+                                                Heat index is computed using the regression formula from the US National Weather Service (see [here](https://www.wpc.ncep.noaa.gov/html/heatindex_equation.shtml) and [here](https://www.weather.gov/ama/heatindex#:~:text=Table_title:%20What%20is%20the%20heat%20index?%20Table_content:,the%20body:%20Heat%20stroke%20highly%20likely%20%7C)). The formulation is expected to be valid for US sub-tropical region, but its use for tropical region like Indonesia does not guarantee very accurate results. However, as first-order approximation, this is already sufficient.
+                                            """,
+                                    className="left-about",
+                                ),
+                                dcc.Markdown(""" 
+                                                Weather data is taken from BMKG's [Data Prakiraan Cuaca Terbuka](https://data.bmkg.go.id/prakiraan-cuaca/) through its free public API.
+                                            """,
+                                    className="left-about",
+                                ),
+
+                                html.Div([
+                                        html.Img(
+                                            src=f"/assets/github.svg",
+                                            className="left-footer",
+                                        ),
+                                        "     ",
+                                        html.A(
+                                            "salirafi", 
+                                            href="https://github.com/salirafi",
+                                            target="_blank",
+                                            className="left-footer"
+                                            ),
+                                ],
+                                className="left-footer",),
+                            ],
+                        )
+                    ],
+                ),
+
+                # RIGHT CONTENT
+                html.Div(id="page-container", className="right-column"),
+            ],
+        ),
+
+        dcc.Store(id="guide-modal-store", data=False),
+        html.Div(
+            id="guide-modal",
+            className="modal-overlay",
+            children=[
+                html.Div(
+                    className="modal-box",
+                    children=[
+                        html.Button("×", id="modal-close", className="modal-close-btn"),
+                        html.Div(id="modal-content", className="modal-content"),
+                    ],
+                )
+            ],
+        ),
+
+    ],
+)
+
+# ====================
+# CALLBACK FUNCTIONS
+# ====================
+
+@app.callback(
+    Output("location_content_ui", "children"),
+    Input("selected_ward_search", "value"),
+)
+def location_content_ui(selected_ward):
+    if not selected_ward: # if no selected ward, display text
+        return build_empty_location_state()
+
+    return build_location_content_layout() # else display data
+
+@app.callback(
+    Output("header-container", "children"),
+    Output("page-container", "children"),
+    Input("url", "pathname"),
+)
+def render_page(pathname):
+    pathname = pathname or "/location"
+
+    header = make_header(pathname)
+
+    if pathname == "/map":
+        return header, map_layout()
+
+    return header, location_layout()
+
+@app.callback(
+    Output("selected_time_idx", "min"),
+    Output("selected_time_idx", "max"),
+    Output("selected_time_idx", "value"),
+    Output("selected_time_idx", "marks"),
+    Input("forecast-times-store", "data"),
+)
+def time_slider(store_data):
+    timestamps = deserialize_timestamps(store_data)
+    if not timestamps:
+        return 0, 0, 0, {}
+
+    marks = build_slider_marks(timestamps)
+    current_idx = 0
+
+    return 0, len(timestamps) - 1, current_idx, marks
+
+@app.callback(
+    Output("forecast-times-store", "data"),
+    Input("url", "pathname"),
+)
+def forecast_times_store(_pathname):
+    times = load_forecast_times()
+    return serialize_timestamps(times)
+
+@app.callback(
+    Output("selected_map_time_text", "children"),
+    Input("selected_time_idx", "value"),
+    Input("forecast-times-store", "data"),
+)
+def selected_map_time_text(selected_idx, store_data):
+    selected_time = get_selected_time_from_store(selected_idx, store_data)
+
+    if selected_time is None:
+        return "Map time: -"
+
+    return f"Map time: {selected_time.strftime('%b %d %H:%M')}"
+
+@app.callback(
+    Output("heat_risk_map", "figure"),
+    Input("selected_time_idx", "value"),
+    State("forecast-times-store", "data"),
+)
+def heat_risk_map(selected_idx, times_data):
+    selected_time = get_selected_time_from_store(selected_idx, times_data)
+
+    if selected_time is None:
+        return {}
+
+    conn = get_conn()
+    try:
+        colormap = create_dynamic_colormap(
+            selected_time=selected_time,
+            conn=conn,
+        )
+    finally:
+        conn.close()
+
+    fig = build_map_figure(
+        boundary_geojson=boundary_json,
+        locations=colormap["customdata"][:, -1].tolist(),
+        colormap=colormap,
+    )
+    fig.update_layout(uirevision="heat-risk-map") # this does not changing the UI, so it should be faster to load
+    return fig
+
+@app.callback(
+    Output("map_legend", "children"),
+    Input("selected_time_idx", "value"),
+)
+def map_legend(_):
+    return build_map_legend()
+
+@app.callback(
+    Output("city_summary_plot", "figure"),
+    Input("selected_time_idx", "value"),
+    State("forecast-times-store", "data"),
+)
+def city_summary_plot(selected_idx, times_data):
+    selected_time = get_selected_time_from_store(selected_idx, times_data)
+
+    if selected_time is None:
+        return {}
+
+    conn = get_conn()
+    try:
+        summary = city_summary_at_time(
+            selected_time=selected_time,
+            conn=conn,
+        )
+    finally:
+        conn.close()
+
+    fig = build_city_summary_plot(summary_value=summary)
+    fig.update_layout(uirevision="city-summary") # this does not changing the UI, so it should be faster to load
+    return fig
+
+@app.callback(
+    Output("current_metrics_ui", "children"),
+    Input("selected_ward_search", "value"),
+    Input("forecast-times-store", "data"),
+)
+def current_metrics_ui(selected_ward, times_data):
+    if not selected_ward:
+        return []
+    snap = load_current_snapshot_df(selected_ward, times_data)
+
+    if snap.empty:
+        return html.Div(
+            "No data for the selected region and time.",
+            className="city-summary-note",
         )
 
-    @reactive.effect
-    @reactive.event(input.guide_lower_risk)
-    def _show_lower_risk_modal():
-        show_heat_risk_modal("Lower Risk")
+    row = snap.iloc[0]
 
-    @reactive.effect
-    @reactive.event(input.guide_caution)
-    def _show_caution_modal():
-        show_heat_risk_modal("Caution")
+    return [
+        html.Div(
+            className="info-card",
+            children=[
+                html.Div("Temperature", className="card-label"),
+                html.Div(f"{row['temperature_c']:.1f}°C", className="card-value"),
+            ],
+        ),
+        html.Div(
+            className="info-card",
+            children=[
+                html.Div("Humidity", className="card-label"),
+                html.Div(f"{row['humidity_ptg']:.1f}%", className="card-value"),
+            ],
+        ),
+        html.Div(
+            className="info-card",
+            children=[
+                html.Div("Heat Index", className="card-label"),
+                html.Div(f"{row['heat_index_c']:.1f}°C", className="card-value"),
+            ],
+        ),
+        html.Div(
+            className="info-card",
+            children=[
+                html.Div("Risk Level", className="card-label"),
+                html.Div(
+                    RISK_ABBR.get(row["risk_level"], row["risk_level"]),
+                    className="card-value",
+                ),
+            ],
+        ),
+        html.Div(
+            className="info-card",
+            children=[
+                html.Div("Weather", className="card-label"),
+                html.Img(
+                    src=f"/assets/{WEATHER_ICON_MAP.get(row['weather_desc'], 'cloudy.svg')}",
+                    className="weather-icon",
+                ),
+            ],
+        ),
+    ]
 
-    @reactive.effect
-    @reactive.event(input.guide_extreme_caution)
-    def _show_extreme_caution_modal():
-        show_heat_risk_modal("Extreme Caution")
+@app.callback(
+    Output("future_forecast_caption", "children"),
+    Input("selected_ward_search", "value"),
+)
+def future_forecast_caption(selected_ward):
+    if not selected_ward:
+        return ""
 
-    @reactive.effect
-    @reactive.event(input.guide_danger)
-    def _show_danger_modal():
-        show_heat_risk_modal("Danger")
+    return f"Future Forecast at {selected_ward}"
 
-    @reactive.effect
-    @reactive.event(input.guide_extreme_danger)
-    def _show_extreme_danger_modal():
-        show_heat_risk_modal("Extreme Danger")
+@app.callback(
+    Output("future_forecast_cards_ui", "children"),
+    Input("selected_ward_search", "value"),
+    Input("forecast-times-store", "data"),
+)
+def future_forecast_cards_ui(selected_ward, times_data):
+    if not selected_ward:
+        return []
+    df = load_future_forecast_df(selected_ward, times_data)
+    return build_forecast_cards(df)
 
-    def show_heat_risk_modal(level: str):
-        guide = HEAT_RISK_GUIDE[level]
+@app.callback(
+    Output("heat_index_evolution_plot", "figure"),
+    Input("selected_ward_search", "value"),
+    Input("forecast-times-store", "data"),
+)
+def heat_index_evolution_plot(selected_ward, times_data):
+    if not selected_ward:
+        return {}
 
-        modal = ui.modal(
-            ui.div(
-                ui.div(
-                    ui.tags.span(
+    evolution_values = load_heat_index_evolution_values(selected_ward, times_data)
+    if evolution_values is None:
+        return {}
+
+    fig = build_heat_index_plot(evolution_values=evolution_values)
+    fig.update_layout(uirevision="heat-index-evolution") # this does not changing the UI, so it should be faster to load
+    return fig
+
+# callback for displaying the current time and database's timestamp
+@app.callback(
+    Output("current_snapshot_time_text", "children"),
+    Input("selected_ward_search", "value"),
+    Input("forecast-times-store", "data"),
+)
+def current_snapshot_time_text(selected_ward, times_data):
+
+    actual_now = pd.Timestamp.now(tz="Asia/Jakarta").tz_localize(None)
+
+    # if no ward selected → show placeholder
+    if not selected_ward:
+        return f"Current time: {actual_now.strftime('%b %d, %H:%M')} Data shown: —"
+
+    data_time = get_nearest_current_time_from_store(times_data)
+
+    if data_time is None:
+        return f"Current time: {actual_now.strftime('%b %d, %H:%M')} Data shown: —"
+
+    return (
+        f"Current time: {actual_now.strftime('%b %d, %H:%M')} "
+        f"Data shown: {data_time.strftime('%b %d, %H:%M')}"
+    )
+
+@app.callback(
+    Output("guide-modal", "className"),
+    Output("modal-content", "children"),
+    Input("guide-btn-1", "n_clicks"),
+    Input("guide-btn-2", "n_clicks"),
+    Input("guide-btn-3", "n_clicks"),
+    Input("guide-btn-4", "n_clicks"),
+    Input("guide-btn-5", "n_clicks"),
+    Input("modal-close", "n_clicks"),
+    prevent_initial_call=True,
+)
+def toggle_modal(b1, b2, b3, b4, b5, close_clicks):
+    trigger = ctx.triggered_id
+
+    if trigger == "modal-close":
+        return "modal-overlay", ""
+
+    level_map = {
+        "guide-btn-1": "Lower Risk",
+        "guide-btn-2": "Caution",
+        "guide-btn-3": "Extreme Caution",
+        "guide-btn-4": "Danger",
+        "guide-btn-5": "Extreme Danger",
+    }
+
+    level = level_map.get(trigger)
+    if level is None:
+        return "modal-overlay", ""
+
+    guide = HEAT_RISK_GUIDE[level]
+
+    modal_body = html.Div(
+        children=[
+            html.Div(
+                className="risk-guide-modal-header",
+                children=[
+                    html.Span(
                         "",
-                        class_="risk-guide-dot",
-                        style=f"background:{RISK_COLOR_MAP[level]}; width:16px; height:16px;"
+                        className="risk-guide-dot",
+                        style={
+                            "background": RISK_COLOR_MAP[level],
+                            "width": "16px",
+                            "height": "16px",
+                        },
                     ),
-                    ui.div(
-                        ui.tags.div(level, class_="risk-guide-modal-title"),
-                        ui.tags.div(guide["level"], class_="caption"),
+                    html.Div(
+                        children=[
+                            html.Div(level, className="risk-guide-modal-title"),
+                            html.Div(guide["level"], className="guide-modal-caption"),
+                        ]
                     ),
-                    class_="risk-guide-modal-header",
-                ),
-                ui.div(
-                    ui.tags.div("What to expect", class_="risk-guide-modal-label"),
-                    ui.tags.div(guide["expect"], class_="risk-guide-modal-text"),
-                    class_="risk-guide-modal-section",
-                ),
-                ui.div(
-                    ui.tags.div("Recommended actions", class_="risk-guide-modal-label"),
-                    ui.tags.div(guide["do"], class_="risk-guide-modal-text"),
-                    class_="risk-guide-modal-section",
-                ),
+                ],
             ),
-            title=None,
-            easy_close=True,
-            footer=None,
-        )
-        ui.modal_show(modal)
-
-    @output
-    @render.ui
-    def reference_ui():
-        return ui.div(
-            ui.h5("Notes and References", class_="panel-subtitle"),
-            ui.div(
-                ui.markdown("""
-                    1. Heat index is computed using the regression formula from the US National Weather Service ([see here](https://www.wpc.ncep.noaa.gov/html/heatindex_equation.shtml) and [here](https://www.weather.gov/ama/heatindex#:~:text=Table_title:%20What%20is%20the%20heat%20index?%20Table_content:,the%20body:%20Heat%20stroke%20highly%20likely%20%7C)), with Celcius to Fahrenheit conversion and vice versa. The formulation is expected to be valid for US sub-tropical region, but its use for tropical region like Indonesia does not guarantee very accurate results. However, as first-order approximation, this is already sufficient.
-
-                    2. Administrative regional border data is retrieved from RBI10K_ADMINISTRASI_DESA_20230928 database provided by Badan Informasi Geospasial (BIG).
-
-                    3. Administrative regional code is taken from [wilayah.id](https://wilayah.id/) based on Kepmendagri No 300.2.2-2138 Tahun 2025.
-
-                    4. Weather forecast data is taken from the public API of Badan Meteorologi, Klimatologi, dan Geofisika (BMKG) accessed via [Data Prakiraan Cuaca Terbuka](https://data.bmkg.go.id/prakiraan-cuaca/).
-
-                    5. The use of generative AI includes: Visual Studio Code's Copilot to help tidying up code and writing comments and docstring, as well as OpenAI's Chat GPT to give code syntax ideas and identify runtime error. Outside of those, including problem formulation and framework of thinking, code logical reasoning and writing, from database management using SQLite to web development using Shiny, all is done solely by the author. 
-                """
-                ),
-                class_="notes-references",
+            html.Div(
+                className="risk-guide-modal-section",
+                children=[
+                    html.Div("What to expect", className="risk-guide-modal-label"),
+                    html.Div(guide["expect"], className="risk-guide-modal-text"),
+                ],
             ),
-            style="margin-top: 1.5rem; margin-bottom: 0.5rem"
-        )
-    
-    session.on_ended(lambda: conn.close())
+            html.Div(
+                className="risk-guide-modal-section",
+                children=[
+                    html.Div("Recommended actions", className="risk-guide-modal-label"),
+                    html.Div(guide["do"], className="risk-guide-modal-text"),
+                ],
+            ),
+        ]
+    )
 
+    return "modal-overlay modal-overlay-show", modal_body
 
-app = App(app_ui, server)
+if __name__ == "__main__":
+    app.run(debug=True)
