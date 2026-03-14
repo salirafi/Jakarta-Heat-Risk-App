@@ -1,14 +1,14 @@
 # Jakarta Heat Risk App
 
-This repository contains the source code to build a Python-based web application with Shiny for Python which is intended to show information about heat index and risk for every single ward (kelurahan) in the Jakarta province. The 3-hourly weather forecast data are available for each ward and are provided by Badan Meteorologi, Klimatologi, dan Geofisika (BMKG) through public API described in [Data Terbuka BMKG](https://data.bmkg.go.id/prakiraan-cuaca/).
+This repository contains the source code to build a Python-based web application with Dash Plotly which is intended to show information about heat index and risk for every single ward (kelurahan) in the Jakarta province. The 3-hourly weather forecast data are available for each ward and are provided by Badan Meteorologi, Klimatologi, dan Geofisika (BMKG) through public API described in [Data Terbuka BMKG](https://data.bmkg.go.id/prakiraan-cuaca/).
 
-To interact with the app without going through difficulty installing anything, please go to my [HuggingFace space](https://huggingface.co/spaces/salirafi/Jakarta-Heat-Risk-App).
+To interact with the app without going through difficulty installing anything, please go [here](https://2e9ab63b-9ef3-412b-b7c2-34af8b63a2a3.plotly.app) (it is not 24 hours live).
 
 ⚠️ **IMPORTANT!** ⚠️  This app is a personal project for data analysis learning, so the BMKG API is not used directly in the app, but rather as database fetching. Also, code might not be optimized for smoother user's experience. For first time loading, the web might take a few seconds.
 
 ## Running
 
-This code can be run with `python3.11`. Before running the code, make sure all prerequisites are installed. Run in the terminal
+This code is run initially with `python3.11`. Before running the code, make sure all prerequisites are installed. Run in the terminal
 ```
 pip install -r requirements.txt
 ```
@@ -22,7 +22,7 @@ This might run for around 4 to 5 minutes (see Content section).
 
 Finally, run
 ```
-shiny run app.py
+python app.py
 ```
 to connect to the web app. 
 
@@ -38,12 +38,11 @@ This project depends heavily on [pandas](https://pandas.pydata.org/) and [SQLite
 
 [fetch](fetch) contains source code for fetching BMKG data ([fetch_weather_data.py](fetch/fetch_weather_data.py)), retrieving region code from [public API](https://wilayah.id/api) ([build_jakarta_preference.py](fetch/build_jakarta_preference.py)), and reading the boundary polygons from RBI data provided by Badan Informasi Geospasial ([fetch_boundary_data.py](fetch/fetch_boundary_data.py)). Note that the only time-dependent data in this repository is the BMKG weather data, so the boundary polygon and region code will always be valid.
 
-[tables](tables) contains SQLite table for boundary polygon and weather data in `heat_risk.db`. The weather data time coverage spans from March 12 2026 20:00 WIB to March 14 2026 20:00 WIB. User can update, or more precisely append, this data by simply running [fetch_weather_data.py](fetch/fetch_weather_data.py) which will append the table with weather data from the user's current time to three days in the future. If there is overlap, the code will replace the old rows (with the same region code and time stamp). Each run will take up about 4 minutes due to polite delay of 1.01 seconds for each of 261 wards in Jakarta to respect BMKG request limit of 60 requests / minute / IP. The file also contains `create_db.py` to create a SQLite database named `heat_risk.db`. There is also a GeoJSON data stored for Choropleth plot.
+[tables](tables) contains SQLite table for boundary polygon and weather data in `heat_risk.db`. The weather data time coverage spans from March 14 2026 17:00 WIB to March 16 2026 17:00 WIB. User can update, or more precisely append, this data by simply running [fetch_weather_data.py](fetch/fetch_weather_data.py) which will append the table with weather data from the user's current time to three days in the future. If there is overlap, the code will replace the old rows (with the same region code and time stamp). Each run will take up about 4 minutes due to polite delay of 1.01 seconds for each of 261 wards in Jakarta to respect BMKG request limit of 60 requests / minute / IP. The file also contains `create_db.py` to create a SQLite database named `heat_risk.db`. There is also a GeoJSON data stored for Choropleth plot.
 
-[src](src) contains the source code for creating the web app, making use of [Shiny for Python](https://shiny.posit.co/py/).
+[src](src) contains the source code for creating the web app, making use of [Dash Plotly]([https://shiny.posit.co/py/](https://dash.plotly.com/)).
 
 The parent folder contains [app.py](app.py), script to run the web app.
-
 
 ## Author's Remarks
 
