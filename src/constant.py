@@ -15,6 +15,14 @@ RISK_ORDER = [
     "Danger",
     "Extreme Danger",
 ]
+RISK_ABBR = {
+    "No Data": "ND",
+    "Lower Risk": "LR",
+    "Caution": "C",
+    "Extreme Caution": "EC",
+    "Danger": "D",
+    "Extreme Danger": "ED",
+}
 RISK_COLOR_MAP = {
     "No Data": "#dcdcdc",
     "Lower Risk": "#66bb6a",
@@ -24,6 +32,15 @@ RISK_COLOR_MAP = {
     "Extreme Danger": "#9c27b0",
 }
 RISK_CODE_MAP = {name: i for i, name in enumerate(RISK_ORDER)}
+
+WEATHER_ICON_MAP = {
+    "Sunny": "day_clear.svg",
+    "Partly Cloudy": "day_partial_cloud.svg",
+    "Cloudy": "cloudy.svg",
+    "Light Rain": "rain.svg",
+    "Rain": "rain.svg",
+    "Thunderstorm": "rain_thunder.svg",
+}
 
 CITY_COLOR_MAP = {
     "Jakarta Barat": "#1f77b4",

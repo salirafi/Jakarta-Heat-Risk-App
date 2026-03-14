@@ -32,7 +32,7 @@ def build_map_figure(
             hovertemplate=(
                 "&nbsp;<b>%{customdata[0]}, %{customdata[1]}</b>&nbsp;<br>"
                 "&nbsp;%{customdata[2]|%b %d %H:%M}&nbsp;<br>"
-                f"&nbsp;{'Heat index'} %{{customdata[3]:.1f}} °C - %{{customdata[4]}}&nbsp;<br>"
+                f"&nbsp;{'HI'} %{{customdata[3]:.1f}} °C - %{{customdata[4]}}&nbsp;<br>"
                 "&nbsp;%{customdata[5]}&nbsp;"
                 "<extra></extra>"
             )
@@ -43,16 +43,25 @@ def build_map_figure(
         visible=False,
         bgcolor="rgba(0,0,0,0)",
         center={"lon": 106.8456, "lat": -6.2088}, # jakarta coordinate
-        # fitbounds="locations",
-        projection_scale=500,
+        fitbounds="locations",
+        # projection_scale=500,
+        projection=dict(scale=5,
+                        type="bonne")
     )
 
     fig.update_layout(
-        height=300,
-        margin=dict(l=0, r=0, t=0, b=0),
+        height=None,
+        autosize=True,
+        margin=dict(l=0, r=0, t=0, b=0, autoexpand=True),
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
         showlegend=False,
+        # geo=dict(
+        #     lonaxis_range=[106.6, 107.0],
+        #     lataxis_range=[-6.4, -6.0],
+        #     projection_scale=1,
+        #     fitbounds=False
+        # ),
         hoverlabel=dict(
             bgcolor="rgba(203, 210, 200, 0.4)",
             font_size=13,
@@ -246,7 +255,7 @@ def build_city_summary_plot(
                 hovertemplate=(
                                 "&nbsp;<b>%{x}</b>&nbsp;<br>"
                                 "&nbsp;%{customdata[0]}&nbsp;<br>"
-                                f"&nbsp;Avg. {metric_label}: %{{y:.1f}} {unit}&nbsp;"
+                                f"&nbsp;{metric_label}: %{{y:.1f}} {unit}&nbsp;"
                                 "<extra></extra>"
                             ),
             ),
@@ -273,7 +282,7 @@ def build_city_summary_plot(
 
     fig.update_layout(
         height=None,
-        margin=dict(l=0, r=0, t=40, b=10),
+        margin=dict(l=0, r=0, t=90, b=90),
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
         barmode="group",
@@ -281,7 +290,7 @@ def build_city_summary_plot(
         legend=dict(
             orientation="h",
             yanchor="bottom",
-            y=1.10,
+            y=-0.17,
             xanchor="left",
             x=0,
             title=None,
@@ -472,8 +481,8 @@ def create_heat_index_arr(df: pd.DataFrame) -> dict:
     y_temp = df["temperature_c"].tolist()
 
     # setting the x and y axis range based on min/max values
-    y_min = df["heat_index_c"].min()
-    y_max = df["heat_index_c"].max()
+    y_min = min(df["heat_index_c"].min(), df["temperature_c"].min())
+    y_max = max(df["heat_index_c"].max(), df["temperature_c"].max())
 
     if y_min == y_max:
         y_min -= 1
