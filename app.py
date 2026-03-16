@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 '''
 Source code to create the web app.
 Note that the pipeline of the code, in default, does not allow outputs of past weather data.
