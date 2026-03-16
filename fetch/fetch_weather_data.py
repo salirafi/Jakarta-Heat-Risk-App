@@ -289,9 +289,9 @@ def align_all_forecasts_to_common_grid(df: pd.DataFrame) -> pd.DataFrame:
     out = out.sort_values(["local_datetime", "adm4"]).reset_index(drop=True) # sort by time first, then by adm4 for easier analysis and visualization later
     return out
 
-# ===================================
-# functions for computing heat index and determining risk level
-# ===================================
+# ────────
+# Functions For Heat Index Computation
+# ────────
 
 # convert temperature from Celsius to Fahrenheit
 def c_to_f(temp_c: float) -> float:
@@ -354,8 +354,8 @@ def classify_heat_risk(heat_index_c: float) -> str:
     else:
         return "Extreme Danger"
     
-# ===================================
-# ===================================
+# ────────
+# ────────
 
 # loading the reference file with the list of adm4 codes and their corresponding location names, 
 # used to fetch forecasts and also to save metadata in the database
