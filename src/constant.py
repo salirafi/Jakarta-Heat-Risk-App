@@ -15,6 +15,14 @@ RISK_ORDER = [
     "Danger",
     "Extreme Danger",
 ]
+RISK_LABEL_MAP = {
+    "No Data": "No Data",
+    "Lower Risk": "Lower Risk (LR)",
+    "Caution": "Caution (C)",
+    "Extreme Caution": "Extreme Caution (EC)",
+    "Danger": "Danger (D)",
+    "Extreme Danger": "Extreme Danger (ED)",
+}
 RISK_ABBR = {
     "No Data": "ND",
     "Lower Risk": "LR",
@@ -22,16 +30,42 @@ RISK_ABBR = {
     "Extreme Caution": "EC",
     "Danger": "D",
     "Extreme Danger": "ED",
+    "Lower Risk (LR)": "LR",
+    "Caution (C)": "C",
+    "Extreme Caution (EC)": "EC",
+    "Danger (D)": "D",
+    "Extreme Danger (ED)": "ED",
 }
 RISK_COLOR_MAP = {
     "No Data": "#dcdcdc",
+
+    # original labels
     "Lower Risk": "#66bb6a",
     "Caution": "#ffee58",
     "Extreme Caution": "#ffa726",
     "Danger": "#ef5350",
     "Extreme Danger": "#9c27b0",
+
+    # display labels with abbreviations
+    "Lower Risk (LR)": "#66bb6a",
+    "Caution (C)": "#ffee58",
+    "Extreme Caution (EC)": "#ffa726",
+    "Danger (D)": "#ef5350",
+    "Extreme Danger (ED)": "#9c27b0",
 }
-RISK_CODE_MAP = {name: i for i, name in enumerate(RISK_ORDER)}
+RISK_CODE_MAP = {
+    "No Data": 0,
+    "Lower Risk": 1,
+    "Caution": 2,
+    "Extreme Caution": 3,
+    "Danger": 4,
+    "Extreme Danger": 5,
+    "Lower Risk (LR)": 1,
+    "Caution (C)": 2,
+    "Extreme Caution (EC)": 3,
+    "Danger (D)": 4,
+    "Extreme Danger (ED)": 5,
+}
 
 WEATHER_ICON_MAP = {
     "Sunny": "day_clear.svg",
