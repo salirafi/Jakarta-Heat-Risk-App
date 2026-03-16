@@ -1,7 +1,7 @@
 '''
-Restyled version of the Jakarta Heat Risk web app.
-Same core logic as the original; visual theme updated to modern-minimalist
-white + light-blue palette with DM Serif Display / DM Sans typography.
+Source code to create the web app.
+Note that the pipeline of the code, in default, does not allow outputs of past weather data.
+This can be changed by changing current_time variable, but note that the definition of 'current time' will not mean the present time anymore.
 '''
 
 from dash import Dash, html, dcc, Input, Output, State, ctx
