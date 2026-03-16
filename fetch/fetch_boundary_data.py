@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 Build and save Jakarta ward (kelurahan) boundary data from RBI geodatabase from Badan Informasi Geospasial.
 Saving is done to SQLite.
