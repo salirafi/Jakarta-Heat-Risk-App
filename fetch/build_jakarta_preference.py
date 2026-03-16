@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 Creating jakarta_reference.csv containing region code for every ward in Jakarta.
 Get data from https://wilayah.id/api
