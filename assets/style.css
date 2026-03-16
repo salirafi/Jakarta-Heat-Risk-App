@@ -1,12 +1,4 @@
-/* ═══════════════════════════════════════════════
-   JAKARTA HEAT RISK  —  Restyled UI
-   Theme: Modern-Minimalist · White + Light Red
-   Fonts: DM Serif Display (display) · DM Sans (body)
-   ═══════════════════════════════════════════════ */
-
 @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,300&display=swap');
-
-/* ── TOKENS ── */
 :root {
   --white:      #ffffff;
   --off-white:  #fdf6f4;          /* warm blush tint instead of cool blue tint  */
@@ -14,13 +6,13 @@
   --red-100:    #fad8d1;
   --red-200:    #f4afa3;
   --red-300:    #eb8070;
-  --red-500:    #d44c38;          /* primary accent red                         */
+  --red-500:    #d44c38;
   --red-700:    #a3321f;
   --red-900:    #5c1a0f;
-  --text:       #3a1a14;          /* deep warm dark, replaces cold blue-900     */
-  --muted:      #a46b60;          /* warm rose-grey                             */
-  --subtle:     #d0a098;          /* light dusty rose                           */
-  --border:     #fad8d1;          /* matches red-100                            */
+  --text:       #3a1a14;
+  --muted:      #a46b60;
+  --subtle:     #d0a098;
+  --border:     #fad8d1;
   --shadow-sm:  0 1px 4px rgba(212,76,56,0.07);
   --shadow-md:  0 4px 24px rgba(212,76,56,0.10);
   --shadow-lg:  0 8px 40px rgba(212,76,56,0.13);
@@ -33,7 +25,6 @@
   --font-serif: 'DM Serif Display', serif;
 }
 
-/* ── RESET ── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 html, body {
@@ -46,9 +37,9 @@ html, body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* ═══════════════════════════════════════════════
-   APP SHELL
-   ═══════════════════════════════════════════════ */
+/* ═══
+   Top-level Shell
+   ═════ */
 
 .app-shell {
   min-height: 100vh;
@@ -57,9 +48,9 @@ html, body {
   flex-direction: column;
 }
 
-/* ═══════════════════════════════════════════════
-   HEADER / NAV
-   ═══════════════════════════════════════════════ */
+/* ════
+   Header (inlucding navbar)
+   ═══ */
 
 .top-header {
   height: var(--nav-h);
@@ -75,8 +66,6 @@ html, body {
   padding: 0 28px;
   gap: 24px;
 }
-
-/* Brand */
 .header-brand {
   flex: 1;
   display: flex;
@@ -98,7 +87,6 @@ html, body {
   letter-spacing: -0.02em;
 }
 
-/* Nav links */
 .header-nav {
   display: flex;
   gap: 4px;
@@ -123,8 +111,6 @@ html, body {
   background: var(--red-100);
   font-weight: 600;
 }
-
-/* Meta (DB update) */
 .header-meta {
   flex: 1;
   display: flex;
@@ -137,9 +123,9 @@ html, body {
 .meta-label { color: var(--muted); }
 .meta-value { font-weight: 600; color: var(--red-900); }
 
-/* ═══════════════════════════════════════════════
-   PAGE BODY
-   ═══════════════════════════════════════════════ */
+/* ════════
+   Page Body
+   ═════ */
 
 .page-body {
   display: flex;
@@ -149,9 +135,9 @@ html, body {
   padding: 16px;
 }
 
-/* ═══════════════════════════════════════════════
-   SIDEBAR
-   ═══════════════════════════════════════════════ */
+/* ═══
+   Sidebar
+   ════ */
 
 .sidebar {
   flex: 0 0 var(--sidebar-w);
@@ -228,9 +214,9 @@ html, body {
 }
 .footer-link:hover { color: var(--red-500); }
 
-/* ═══════════════════════════════════════════════
-   HEAT RISK GUIDE (sidebar)
-   ═══════════════════════════════════════════════ */
+/* ═══════════
+   Heat Risk Guide
+   ═════════ */
 
 .guide-section { margin-bottom: 0; }
 
@@ -286,9 +272,9 @@ html, body {
   font-weight: 500;
 }
 
-/* ═══════════════════════════════════════════════
-   MAIN CONTENT
-   ═══════════════════════════════════════════════ */
+/* ═══════════
+   Main Content
+   ═════════ */
 
 .main-content {
   flex: 1;
@@ -296,8 +282,6 @@ html, body {
   display: flex;
   flex-direction: column;
 }
-
-/* ── Right panels ── */
 .right-panel {
   flex: 1;
   background: var(--white);
@@ -314,9 +298,9 @@ html, body {
   flex-direction: column;
 }
 
-/* ═══════════════════════════════════════════════
-   SEARCH BAR ROW  (Ward Info page)
-   ═══════════════════════════════════════════════ */
+/* ═══════
+   Search bar row (for search bar and small text on left)
+   ═════════ */
 
 .search-bar-row {
   display: grid;
@@ -338,8 +322,6 @@ html, body {
   grid-column: 2;
   width: 100%;
 }
-
-/* Dash Dropdown overrides */
 .ward-dropdown .Select-control,
 .ward-dropdown .select__control {
   min-height: 42px;
@@ -388,9 +370,9 @@ html, body {
 
 .search-spacer { grid-column: 3; }
 
-/* ═══════════════════════════════════════════════
-   LOCATION BODY
-   ═══════════════════════════════════════════════ */
+/* ═══════
+   Body
+   ══════ */
 
 .location-body {
   flex: 1;
@@ -400,7 +382,7 @@ html, body {
   padding: 0 20px 16px 20px;
 }
 
-/* ── Empty state ── */
+/* ── Emmty condition when uers don't select ward ── */
 .empty-state {
   flex: 1;
   display: flex;
@@ -426,9 +408,9 @@ html, body {
   padding: 12px 0;
 }
 
-/* ═══════════════════════════════════════════════
-   CURRENT METRICS CARDS
-   ═══════════════════════════════════════════════ */
+/* ════════
+   Current Metric Cards
+   ══════════ */
 
 .metrics-row {
   display: flex;
@@ -469,7 +451,7 @@ html, body {
 }
 
 /* ═══════════════════════════════════════════════
-   FORECAST CARDS (horizontal scroll)
+   Forecast Cards (With Horizontal Scroll)
    ═══════════════════════════════════════════════ */
 
 .forecast-section {
@@ -535,9 +517,9 @@ html, body {
 }
 .fc-risk { font-size: 0.78rem; }
 
-/* ═══════════════════════════════════════════════
-   HEAT INDEX EVOLUTION PLOT
-   ═══════════════════════════════════════════════ */
+/* ═══════
+   Heat Index Evolution Plot
+   ════════ */
 
 .evolution-section {
   flex: 1 1 260px;
@@ -563,9 +545,9 @@ html, body {
   font-style: italic;
 }
 
-/* ═══════════════════════════════════════════════
-   MAP PAGE
-   ═══════════════════════════════════════════════ */
+/* ═════
+   Map Page
+   ════ */
 
 .slider-row {
   display: flex;
@@ -588,7 +570,7 @@ html, body {
   width: calc(100% - 48px);
 }
 
-/* Dash slider override */
+/* Overriding Dash slider */
 .rc-slider-rail     { background: var(--red-100) !important; }
 .rc-slider-track    { background: var(--red-500) !important; }
 .rc-slider-handle   {
@@ -662,7 +644,7 @@ html, body {
   min-height: 0;
 }
 
-/* Legend */
+/* Map Legend */
 .legend-container {
   flex: 0 0 auto;
   display: flex;
@@ -703,9 +685,9 @@ html, body {
   white-space: nowrap;
 }
 
-/* ═══════════════════════════════════════════════
-   MODAL
-   ═══════════════════════════════════════════════ */
+/* ═════
+   Modal
+   ═════ */
 
 .modal-overlay {
   position: fixed;
@@ -764,7 +746,6 @@ html, body {
   line-height: 1.55;
   margin-top: 8px;
 }
-
 .modal-header {
   display: flex;
   align-items: center;
@@ -790,7 +771,6 @@ html, body {
 }
 
 .modal-section + .modal-section { margin-top: 14px; }
-
 .modal-section-label {
   font-size: 0.7rem;
   font-weight: 600;
