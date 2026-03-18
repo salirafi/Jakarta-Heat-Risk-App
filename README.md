@@ -14,7 +14,7 @@ pip install -r requirements.txt
 ```
 It is recommended to work on virtual environment to isolate project dependencies.
 
-Then, if the user wants up-to-date weather data, in the parent folder, run
+Then, to make sure the weather database is up-to-date, in the parent folder, run
 ```
 python3 .\fetch\fetch_weather_data.py
 ```
