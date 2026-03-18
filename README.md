@@ -16,7 +16,7 @@ It is recommended to work on virtual environment to isolate project dependencies
 
 Then, to make sure the weather database is up-to-date, in the parent folder, run
 ```
-python3 .\fetch\fetch_weather_data.py
+python .\fetch\fetch_weather_data.py
 ```
 This might run for around 4 to 5 minutes (see Content section).
 
