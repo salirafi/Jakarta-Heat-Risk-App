@@ -374,10 +374,10 @@ def build_empty_location_state():
 
 def build_location_content():
     return [
-        # Current metrics cards
+        # current metrics cards
         html.Div(id="current_metrics_ui", className="metrics-row"),
 
-        # Forecast cards (horizontal scroll)
+        # forecast cards (horizontal scroll)
         html.Div(
             className="forecast-section",
             children=[
@@ -385,7 +385,7 @@ def build_location_content():
             ],
         ),
 
-        # Heat index evolution plot
+        # heat index evolution plot
         html.Div(
             className="evolution-section",
             children=[
@@ -565,6 +565,8 @@ def current_metrics_ui(selected_ward, times_data):
             children=[
                 html.Div("Risk Level", className="metric-label"),
                 html.Div(
+                    # using the abbreviation for each risk level for short text
+                    # see the heat risk guide or RISK_ABBR for the corresponding abbreviation
                     RISK_ABBR.get(row["risk_level"], row["risk_level"]),
                     className="metric-value",
                 ),
@@ -619,7 +621,7 @@ def heat_index_evolution_plot(selected_ward, times_data):
 def current_snapshot_time_text(selected_ward, times_data):
     actual_now = pd.Timestamp.now(tz="Asia/Jakarta").tz_localize(None)
 
-    # if no ward selected → show placeholder
+    # if no ward selected, show placeholder "-"
     if not selected_ward:
         return f"Now: {actual_now.strftime('%b %d, %H:%M')}  ·  Data: —"
     data_time = get_nearest_current_time_from_store(times_data)
