@@ -63,9 +63,9 @@ def make_header(pathname="/location"):
     )
 
 
-# ─────
+# ##############
 #  Helpers Related to Data
-# ─────
+# ##############
 
 # get the nearest available time in the database from the current time
 def get_nearest_current_time_from_store(times_data):
@@ -152,9 +152,9 @@ def load_future_forecast_df(selected_ward, times_data):
         conn.close()
     return df
 
-# ──────────
+# ##################
 #  UI Component
-# ─────────
+# #################
 
 # creating the future forecast cards
 def build_forecast_cards(df):
@@ -182,7 +182,6 @@ def build_forecast_cards(df):
         )
     return html.Div(cards, className="forecast-scroll")
 
-
 def build_map_legend():
     levels = [
         "No Data",
@@ -208,7 +207,6 @@ def build_map_legend():
             for level in levels
         ],
     )
-
 
 def build_metric_card(label, value, extra_class=""):
     return html.Div(
@@ -403,9 +401,9 @@ def build_location_content():
     ]
 
 
-# ─────────
+# ##############
 #  Root Layout
-# ─────────
+# #############
 
 app.layout = html.Div(
     className="app-shell",
@@ -492,9 +490,9 @@ via free public API.
 )
 
 
-# ───────
+# ###################
 #  Callback Functions
-# ────────
+# ################
 
 @app.callback(
     Output("header-container", "children"),
@@ -505,7 +503,7 @@ def render_page(pathname):
     pathname = pathname or "/location"
     header   = make_header(pathname)
     if pathname == "/map":
-        return header, map_layout()
+        return header, map_layout() # switching between pages
     return header, location_layout()
 
 @app.callback(
@@ -608,7 +606,7 @@ def heat_index_evolution_plot(selected_ward, times_data):
         return {}
     fig = build_heat_index_plot(evolution_values=evolution_values)
 
-    # this does not changing the UI, so it should be faster to load
+    # this does not change the UI, so it should be faster to load
     fig.update_layout(uirevision="heat-index-evolution")
     return fig
 
@@ -644,7 +642,7 @@ def time_slider(store_data):
     if not timestamps:
         return 0, 0, 0, {}
     marks       = build_slider_marks(timestamps)
-    return 0, len(timestamps) - 1, 0, marks
+    return 0, len(timestamps) - 1, 0, marks # numbering marks (but later not shown in the app)
 
 @app.callback(
     Output("selected_map_time_text", "children"),
@@ -677,7 +675,7 @@ def heat_risk_map(selected_idx, times_data):
         colormap=colormap,
     )
 
-    # this does not changing the UI, so it should be faster to load
+    # this does not change the UI, so it should be faster to load
     fig.update_layout(uirevision="heat-risk-map")
     return fig
 
@@ -704,7 +702,7 @@ def city_summary_plot(selected_idx, times_data):
         conn.close()
     fig = build_city_summary_plot(summary_value=summary)
 
-    # this does not changing the UI, so it should be faster to load
+    # this does not change the UI, so it should be faster to load
     fig.update_layout(uirevision="city-summary")
     return fig
 
