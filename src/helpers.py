@@ -1,3 +1,8 @@
+#!/usr/bin/env python3
+'''
+Source code for other helpers functions.
+'''
+
 import sqlite3
 import pandas as pd
 import json
