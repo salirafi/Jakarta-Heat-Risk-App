@@ -290,9 +290,10 @@ def align_all_forecasts_to_common_grid(df: pd.DataFrame) -> pd.DataFrame:
     out = out.sort_values(["local_datetime", "adm4"]).reset_index(drop=True) # sort by time first, then by adm4 for easier analysis and visualization later
     return out
 
-# ────────
+# ###############
 # Functions For Heat Index Computation
-# ────────
+# see https://www.wpc.ncep.noaa.gov/html/heatindex_equation.shtml
+# ##############
 
 # convert temperature from Celsius to Fahrenheit
 def c_to_f(temp_c: float) -> float:
@@ -303,7 +304,6 @@ def f_to_c(temp_f: float) -> float:
     return (temp_f - 32) * 5 / 9
 
 # compute heat index in Celsius using the formula from US National Weather Service, with adjustments for low humidity and high humidity
-# see https://www.wpc.ncep.noaa.gov/html/heatindex_equation.shtml
 # valid at least for US subtropical conditions
 def compute_heat_index_c(temp_c: float, rh: float) -> float:
     if pd.isna(temp_c) or pd.isna(rh):
@@ -355,8 +355,8 @@ def classify_heat_risk(heat_index_c: float) -> str:
     else:
         return "Extreme Danger"
     
-# ────────
-# ────────
+# ########
+# ######
 
 # loading the reference file with the list of adm4 codes and their corresponding location names, 
 # used to fetch forecasts and also to save metadata in the database
@@ -509,6 +509,7 @@ def save_to_sqlite(df: pd.DataFrame, db_path: Path) -> None:
             if_exists="replace",
             index=False,
         )
+        # build indexing for faster query
         conn.execute(f"""
             CREATE INDEX IF NOT EXISTS idx_city_summary_time
             ON {CITY_SUMMARY_TABLE} (local_datetime);
