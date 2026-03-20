@@ -104,64 +104,6 @@ def available_timestamps(start_time: pd.Timestamp, end_time: pd.Timestamp, conn)
 
     return pd.to_datetime(df["local_datetime"]).tolist() # list of pd.Timestamp sorted
 
-# functions to get available options for region filtering
-def city_options(conn) -> list[str]: # fory city-level
-    query = f"""
-        SELECT DISTINCT kota_kabupaten
-        FROM {WEATHER_TABLE}
-        WHERE kota_kabupaten IS NOT NULL
-          AND TRIM(kota_kabupaten) != ''
-        ORDER BY kota_kabupaten
-    """
-    df = run_query(query, conn)
-    if df.empty:
-        return []
-    return df["kota_kabupaten"].astype(str).str.strip().tolist()
-def subdistrict_options(selected_city: str, conn) -> list[str]: # for subdistrict-level
-    query = f"""
-        SELECT DISTINCT kecamatan
-        FROM {WEATHER_TABLE}
-        WHERE kota_kabupaten = '{selected_city}'
-          AND kecamatan IS NOT NULL
-          AND TRIM(kecamatan) != ''
-        ORDER BY kecamatan
-    """
-    df = run_query(query, conn)
-    if df.empty:
-        return []
-    return df["kecamatan"].astype(str).str.strip().tolist()
-def ward_options(selected_city: str, selected_subdistrict: str, conn) -> list[str]: # for ward-level
-    query = f"""
-        SELECT DISTINCT desa_kelurahan
-        FROM {WEATHER_TABLE}
-        WHERE kota_kabupaten = '{selected_city}'
-          AND kecamatan = '{selected_subdistrict}'
-          AND desa_kelurahan IS NOT NULL
-          AND TRIM(kecamatan) != ''
-        ORDER BY kecamatan
-    """
-    df = run_query(query, conn)
-    if df.empty:
-        return []
-    return df["desa_kelurahan"].astype(str).str.strip().tolist()
-
-# function to get the region code for the selected region for filtering the database to the selected reigion
-def ward_final_selection(selected_city: str, selected_subdistrict: str, selected_ward: str, conn) -> str | None:
-    query = f"""
-        SELECT adm4
-        FROM {WEATHER_TABLE}
-        WHERE kota_kabupaten = '{selected_city}'
-          AND kecamatan = '{selected_subdistrict}'
-          AND desa_kelurahan = '{selected_ward}'
-        ORDER BY local_datetime
-        LIMIT 1
-    """
-    df = run_query(query, conn)
-    if df.empty:
-        return None
-    value = df.iloc[0]["adm4"] # get the code
-    return str(value).strip()
-
 # selecting rows with the filtered-region and (current) time
 def current_condition(adm4: str, current_time: pd.Timestamp, conn) -> pd.DataFrame:
     query = f"""
@@ -286,5 +228,68 @@ def build_slider_marks(times):
         i: pd.Timestamp(times[i]).strftime("%b %d\n%H:%M")
         for i in idxs
     }
+
+# ##############
+# FUNCTIONS FOR DROP-DOWN SELECTION
+# since the current version of the app uses search bar,
+# these functions below are deprecated and collectively replaced by make_ward_search_options()
+# ##############
+
+def city_options(conn) -> list[str]: # fory city-level
+    query = f"""
+        SELECT DISTINCT kota_kabupaten
+        FROM {WEATHER_TABLE}
+        WHERE kota_kabupaten IS NOT NULL
+          AND TRIM(kota_kabupaten) != ''
+        ORDER BY kota_kabupaten
+    """
+    df = run_query(query, conn)
+    if df.empty:
+        return []
+    return df["kota_kabupaten"].astype(str).str.strip().tolist()
+def subdistrict_options(selected_city: str, conn) -> list[str]: # for subdistrict-level
+    query = f"""
+        SELECT DISTINCT kecamatan
+        FROM {WEATHER_TABLE}
+        WHERE kota_kabupaten = '{selected_city}'
+          AND kecamatan IS NOT NULL
+          AND TRIM(kecamatan) != ''
+        ORDER BY kecamatan
+    """
+    df = run_query(query, conn)
+    if df.empty:
+        return []
+    return df["kecamatan"].astype(str).str.strip().tolist()
+def ward_options(selected_city: str, selected_subdistrict: str, conn) -> list[str]: # for ward-level
+    query = f"""
+        SELECT DISTINCT desa_kelurahan
+        FROM {WEATHER_TABLE}
+        WHERE kota_kabupaten = '{selected_city}'
+          AND kecamatan = '{selected_subdistrict}'
+          AND desa_kelurahan IS NOT NULL
+          AND TRIM(kecamatan) != ''
+        ORDER BY kecamatan
+    """
+    df = run_query(query, conn)
+    if df.empty:
+        return []
+    return df["desa_kelurahan"].astype(str).str.strip().tolist()
+    
+# function to get the region code for the selected region for filtering the database to the selected reigion
+def ward_final_selection(selected_city: str, selected_subdistrict: str, selected_ward: str, conn) -> str | None:
+    query = f"""
+        SELECT adm4
+        FROM {WEATHER_TABLE}
+        WHERE kota_kabupaten = '{selected_city}'
+          AND kecamatan = '{selected_subdistrict}'
+          AND desa_kelurahan = '{selected_ward}'
+        ORDER BY local_datetime
+        LIMIT 1
+    """
+    df = run_query(query, conn)
+    if df.empty:
+        return None
+    value = df.iloc[0]["adm4"] # get the code
+    return str(value).strip()
 
 
