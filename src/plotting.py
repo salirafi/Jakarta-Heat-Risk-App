@@ -1,3 +1,9 @@
+#!/usr/bin/env python3
+'''
+Helpers for plotting functions.
+Some of the functions include SQL query for faster loading logic.
+'''
+
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import pandas as pd
@@ -144,6 +150,7 @@ def make_discrete_colorscale():
 #         "z": z,
 #         "customdata": customdata,
 #     }
+
 def create_dynamic_colormap(
     selected_time: pd.Timestamp,
     conn,
@@ -166,7 +173,7 @@ def create_dynamic_colormap(
         ORDER BY b.adm4
     """
 
-    merged = run_query(query, conn)
+    merged = run_query(query, conn) # merging between weather and boundary data is done in SQL
 
     merged["local_datetime"] = merged["local_datetime"].apply(format_timestamp)
 
@@ -481,6 +488,7 @@ def create_heat_index_arr(df: pd.DataFrame) -> dict:
     y_temp = df["temperature_c"].tolist()
 
     # setting the x and y axis range based on min/max values
+    # the max is from HI and min from temperature because HI is generally higher than temperature
     y_min = min(df["heat_index_c"].min(), df["temperature_c"].min())
     y_max = max(df["heat_index_c"].max(), df["temperature_c"].max())
 
