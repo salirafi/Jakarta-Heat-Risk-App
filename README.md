@@ -6,6 +6,8 @@ To interact with the app without going through difficulty installing anything, p
 
 ⚠️ **IMPORTANT!** ⚠️  This app is a personal project for data analysis learning, so the BMKG API is not used directly in the app, but rather as database fetching. Also, code might not be optimized for smoother user's experience. For first time loading, the web might take a few seconds.
 
+![Jakarta Heat Risk App](/figures/main_page.png)
+
 ## Running
 
 This code is run initially with `python3.11`. Before running the code, make sure all prerequisites are installed. Run in the terminal
