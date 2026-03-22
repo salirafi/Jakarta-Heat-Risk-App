@@ -34,13 +34,15 @@ Please note that the web app shows the weather forecast from roughly the user's 
 
 If the user wants to run [fetch_boundary_data.py](src/fetch_boundary_data.py), make sure they have downloaded the required .gdb file from [here](https://geoservices.big.go.id/portal/apps/webappviewer/index.html?id=cb58db080712468cb4bfd408dbde3d70).
 
+The current default for `current_time` (the "now" time) is set to March 22 2026, 11:00 WIB. This can be changed as necessary.
+
 ## Content
 
 This project depends heavily on [pandas](https://pandas.pydata.org/) and [SQLite](https://sqlite.org/) environment, though no SQLite broswer needs to be installed since all interface is done with Python.
 
 [fetch](fetch) contains source code for fetching BMKG data ([fetch_weather_data.py](fetch/fetch_weather_data.py)), retrieving region code from [public API](https://wilayah.id/api) ([build_jakarta_preference.py](fetch/build_jakarta_preference.py)), and reading the boundary polygons from RBI data provided by Badan Informasi Geospasial ([fetch_boundary_data.py](fetch/fetch_boundary_data.py)). Note that the only time-dependent data in this repository is the BMKG weather data, so the boundary polygon and region code will always be valid.
 
-[tables](tables) contains SQLite table for boundary polygon and weather data in `heat_risk.db`. The weather data time coverage spans from March 14 2026 17:00 WIB to March 16 2026 17:00 WIB. User can update, or more precisely append, this data by simply running [fetch_weather_data.py](fetch/fetch_weather_data.py) which will append the table with weather data from the user's current time to three days in the future. If there is overlap, the code will replace the old rows (with the same region code and time stamp). Each run will take up about 4 minutes due to polite delay of 1.01 seconds for each of 261 wards in Jakarta to respect BMKG request limit of 60 requests / minute / IP. The file also contains `create_db.py` to create a SQLite database named `heat_risk.db`. There is also a GeoJSON data stored for Choropleth plot.
+[tables](tables) contains SQLite table for boundary polygon and weather data in `heat_risk.db`. The weather data time coverage spans from March 22 2026 11:00 WIB to March 24 2026 20:00 WIB. User can update, or more precisely append, this data by simply running [fetch_weather_data.py](fetch/fetch_weather_data.py) which will append the table with weather data from the user's current time to three days in the future. If there is overlap, the code will replace the old rows (with the same region code and time stamp). Each run will take up about 4 minutes due to polite delay of 1.01 seconds for each of 261 wards in Jakarta to respect BMKG request limit of 60 requests / minute / IP. The file also contains `create_db.py` to create a SQLite database named `heat_risk.db`. There is also a GeoJSON data stored for Choropleth plot.
 
 [assets](assets) contains all the static assets that are used in the app, including the .css file for styling, while [src](src) contains the source code for creating the web app, making use of [Dash Plotly]([https://shiny.posit.co/py/](https://dash.plotly.com/)).
 
