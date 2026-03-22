@@ -20,7 +20,8 @@ from src.helpers import *
 from src.plotting import *
 
 boundary_json = load_boundary_data() # pd.DataFrame and JSON dict
-current_time  = pd.Timestamp.now(tz="Asia/Jakarta").tz_localize(None) # definition of current_time
+# current_time  = pd.Timestamp.now(tz="Asia/Jakarta").tz_localize(None) # definition of current_time
+current_time = pd.Timestamp(year=2026, month=3, day=21) # comment this and uncomment the above code to set an actual current time
 
 app = Dash(__name__, suppress_callback_exceptions=True)
 
@@ -617,7 +618,8 @@ def heat_index_evolution_plot(selected_ward, times_data):
     Input("forecast-times-store",        "data"),
 )
 def current_snapshot_time_text(selected_ward, times_data):
-    actual_now = pd.Timestamp.now(tz="Asia/Jakarta").tz_localize(None)
+    # actual_now = pd.Timestamp.now(tz="Asia/Jakarta").tz_localize(None)
+    actual_now = pd.Timestamp(year=2026, month=3, day=21) # comment this and uncomment the above code to set an actual current time
 
     # if no ward selected, show placeholder "-"
     if not selected_ward:
