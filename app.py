@@ -21,7 +21,7 @@ from src.plotting import *
 
 boundary_json = load_boundary_data() # pd.DataFrame and JSON dict
 # current_time  = pd.Timestamp.now(tz="Asia/Jakarta").tz_localize(None) # definition of current_time
-current_time = pd.Timestamp(year=2026, month=3, day=21) # comment this and uncomment the above code to set an actual current time
+current_time = pd.Timestamp(year=2026, month=3, day=22, hour=11)
 
 app = Dash(__name__, suppress_callback_exceptions=True)
 
@@ -411,6 +411,7 @@ app.layout = html.Div(
     children=[
         dcc.Location(id="url"),
         dcc.Store(id="forecast-times-store"),
+        dcc.Store(id="startup-modal-seen", data=False, storage_type="session"), # start-up modal; comment out this
 
         html.Div(id="header-container"),
 
@@ -494,6 +495,30 @@ via free public API.
 # ###################
 #  Callback Functions
 # ################
+
+# # callbak for showing start-up modal; comment this in the future
+# @app.callback(
+#     Output("guide-modal", "className", allow_duplicate=True),
+#     Output("modal-content", "children", allow_duplicate=True),
+#     Output("startup-modal-seen", "data"),
+#     Input("url", "pathname"),
+#     State("startup-modal-seen", "data"),
+#     prevent_initial_call=False,
+# )
+# def show_startup_modal(_pathname, seen):
+#     if seen:
+#         return "modal-overlay", "", True
+
+#     modal_body = html.Div(
+#         children=[
+#             html.Div("Notice", className="modal-risk-title"),
+#             html.Div(
+#                 "The default current time is currently set to a fixed value, not the real live current time due to the use of local SQLite database. This will be changed in the future.",
+#                 className="modal-section-text",
+#             ),
+#         ]
+#     )
+#     return "modal-overlay modal-show", modal_body, True
 
 @app.callback(
     Output("header-container", "children"),
@@ -618,17 +643,15 @@ def heat_index_evolution_plot(selected_ward, times_data):
     Input("forecast-times-store",        "data"),
 )
 def current_snapshot_time_text(selected_ward, times_data):
-    # actual_now = pd.Timestamp.now(tz="Asia/Jakarta").tz_localize(None)
-    actual_now = pd.Timestamp(year=2026, month=3, day=21) # comment this and uncomment the above code to set an actual current time
 
     # if no ward selected, show placeholder "-"
     if not selected_ward:
-        return f"Now: {actual_now.strftime('%b %d, %H:%M')}  ·  Data: —"
+        return f"Now: {current_time.strftime('%b %d, %H:%M')}  ·  Data: —"
     data_time = get_nearest_current_time_from_store(times_data)
     if data_time is None:
-        return f"Now: {actual_now.strftime('%b %d, %H:%M')}  ·  Data: —"
+        return f"Now: {current_time.strftime('%b %d, %H:%M')}  ·  Data: —"
     return (
-        f"Now: {actual_now.strftime('%b %d, %H:%M')}  ·  "
+        f"Now: {current_time.strftime('%b %d, %H:%M')}  ·  "
         f"Data: {data_time.strftime('%b %d, %H:%M')}"
     )
 
@@ -709,20 +732,45 @@ def city_summary_plot(selected_idx, times_data):
     return fig
 
 @app.callback(
-    Output("guide-modal",    "className"),
-    Output("modal-content",  "children"),
-    Input("guide-btn-1",     "n_clicks"),
-    Input("guide-btn-2",     "n_clicks"),
-    Input("guide-btn-3",     "n_clicks"),
-    Input("guide-btn-4",     "n_clicks"),
-    Input("guide-btn-5",     "n_clicks"),
-    Input("modal-close",     "n_clicks"),
-    prevent_initial_call=True,
+    Output("guide-modal", "className"),
+    Output("modal-content", "children"),
+    Output("startup-modal-seen", "data"),
+    Input("url", "pathname"),
+    Input("guide-btn-1", "n_clicks"),
+    Input("guide-btn-2", "n_clicks"),
+    Input("guide-btn-3", "n_clicks"),
+    Input("guide-btn-4", "n_clicks"),
+    Input("guide-btn-5", "n_clicks"),
+    Input("modal-close", "n_clicks"),
+    State("startup-modal-seen", "data"),
+    prevent_initial_call=False,
 )
-def toggle_modal(b1, b2, b3, b4, b5, close_clicks):
+def toggle_modal(_pathname, b1, b2, b3, b4, b5, close_clicks, startup_seen):
     trigger = ctx.triggered_id
+
+    # show startup modal only once per browser session; comment this in the future
+    if trigger in (None, "url") and not startup_seen:
+        modal_body = html.Div(
+            children=[
+                html.Div(
+                    "⚠️ Important ⚠️",
+                    style={
+                        "fontWeight": "700",
+                        "fontSize": "1.4rem",
+                        "marginBottom": "10px"
+                    }
+                ),
+                html.Div(
+                    "The default current time is currently set to a fixed value (March 22, 2026 11:00 WIB), not the real live current time due to the use of local SQLite database. This will be changed in the future.",
+                    className="modal-section-text",
+                ),
+            ]
+        )
+        return "modal-overlay modal-show", modal_body, True
+
+    # close modal
     if trigger == "modal-close":
-        return "modal-overlay", ""
+        return "modal-overlay", "", startup_seen
 
     level_map = {
         "guide-btn-1": "Lower Risk",
@@ -732,8 +780,9 @@ def toggle_modal(b1, b2, b3, b4, b5, close_clicks):
         "guide-btn-5": "Extreme Danger",
     }
     level = level_map.get(trigger)
+
     if level is None:
-        return "modal-overlay", ""
+        return "modal-overlay", "", startup_seen
 
     guide = HEAT_RISK_GUIDE[level]
 
@@ -746,29 +795,34 @@ def toggle_modal(b1, b2, b3, b4, b5, close_clicks):
                         className="risk-dot modal-risk-dot",
                         style={"background": RISK_COLOR_MAP[level]},
                     ),
-                    html.Div([
-                        html.Div(RISK_LABEL_MAP.get(level, level), className="modal-risk-title"),
-                        html.Div(guide["level"],  className="modal-risk-sub"),
-                    ]),
+                    html.Div(
+                        [
+                            html.Div(
+                                RISK_LABEL_MAP.get(level, level),
+                                className="modal-risk-title",
+                            ),
+                            html.Div(guide["level"], className="modal-risk-sub"),
+                        ]
+                    ),
                 ],
             ),
             html.Div(
                 className="modal-section",
                 children=[
-                    html.Div("What to expect",   className="modal-section-label"),
-                    html.Div(guide["expect"],     className="modal-section-text"),
+                    html.Div("What to expect", className="modal-section-label"),
+                    html.Div(guide["expect"], className="modal-section-text"),
                 ],
             ),
             html.Div(
                 className="modal-section",
                 children=[
                     html.Div("Recommended actions", className="modal-section-label"),
-                    html.Div(guide["do"],            className="modal-section-text"),
+                    html.Div(guide["do"], className="modal-section-text"),
                 ],
             ),
         ]
     )
-    return "modal-overlay modal-show", modal_body
+    return "modal-overlay modal-show", modal_body, startup_seen
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run()
