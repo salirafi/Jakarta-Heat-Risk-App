@@ -2,7 +2,7 @@
 
 This repository contains the source code to build a Python-based web application with Dash Plotly which is intended to show information about heat index and risk for every single ward (kelurahan) in the Jakarta province. The 3-hourly weather forecast data are available for each ward and are provided by Badan Meteorologi, Klimatologi, dan Geofisika (BMKG) through public API described in [Data Terbuka BMKG](https://data.bmkg.go.id/prakiraan-cuaca/).
 
-To interact with the app without going through difficulty installing anything, please go [here](https://2e9ab63b-9ef3-412b-b7c2-34af8b63a2a3.plotly.app) (it is not 24 hours live).
+To interact with the app without going through difficulty installing anything, please go to the deployed version [here](https://2e9ab63b-9ef3-412b-b7c2-34af8b63a2a3.plotly.app) (it is not 24 hours live).
 
 ⚠️ **IMPORTANT!** ⚠️  This app is a personal project for data analysis learning, so the BMKG API is not used directly in the app, but rather as database fetching. Also, code might not be optimized for smoother user's experience. For first time loading, the web might take a few seconds.
 
