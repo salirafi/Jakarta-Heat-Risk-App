@@ -2,11 +2,20 @@
 
 This repository contains the source code to build a Python-based web application with Dash Plotly which is intended to show information about heat index and risk for every single ward (kelurahan) in the Jakarta province. The 3-hourly weather forecast data are available for each ward and are provided by Badan Meteorologi, Klimatologi, dan Geofisika (BMKG) through public API described in [Data Terbuka BMKG](https://data.bmkg.go.id/prakiraan-cuaca/).
 
-To interact with the app without going through difficulty installing anything, please go to the deployed version [here](https://2e9ab63b-9ef3-412b-b7c2-34af8b63a2a3.plotly.app) (it is not 24 hours live).
+🎥 [**You can see the LIVE DEMO here.**](https://jakarta-heat-risk-app.vercel.app/) 🎥
 
 ⚠️ **IMPORTANT!** ⚠️  This app is a personal project for data analysis learning, so the BMKG API is not used directly in the app, but rather as database fetching. Also, code might not be optimized for smoother user's experience. For first time loading, the web might take a few seconds.
 
 ![Jakarta Heat Risk App](/figures/main_page.png)
+
+## Tools Used
+
+### Backend
+- Pandas
+- SQLite
+
+### Frontend
+- Dash Plotly
 
 ## Running
 
@@ -37,6 +46,26 @@ If the user wants to run [fetch_boundary_data.py](src/fetch_boundary_data.py), m
 The current default for `current_time` (the "now" time) is set to March 22 2026, 11:00 WIB. This can be changed as necessary.
 
 ## Content
+
+```text
+.
+├── fetch/ 
+│   ├── fetch_weather_data.py       # Fetches BMKG weather data
+│   ├── build_jakarta_preference.py # Retrieves region codes
+│   └── fetch_boundary_data.py      # Loads boundary polygons
+|
+├── tables/  
+│   ├── heat_risk.db               # Main database (weather + boundary data)
+│   ├── create_db.py               # Script to initialize database
+│
+├── assets/                        # Static frontend assets
+│   └── (CSS, styling, etc.)
+│
+├── src/                           
+│   └── Built with Dash Plotly  
+│
+└── app.py                         # Entry point to run the web app with Dash Plotly
+```
 
 This project depends heavily on [pandas](https://pandas.pydata.org/) and [SQLite](https://sqlite.org/) environment, though no SQLite broswer needs to be installed since all interface is done with Python.
 
