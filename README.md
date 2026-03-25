@@ -13,6 +13,7 @@ This repository contains the source code to build a Python-based web application
 ### Backend
 - Pandas
 - SQLite
+- Plotly
 
 ### Frontend
 - Dash Plotly
