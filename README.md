@@ -4,7 +4,7 @@ This repository contains the source code to build a Python-based web application
 
 🎥 [**YOU CAN ACCESS THE LIVE DEMO HERE**](https://jakarta-heat-risk-app.vercel.app/) 🎥
 
-⚠️ **IMPORTANT!** ⚠️  This app is a personal project for data analysis learning, so the BMKG API is not used directly in the app, but rather as database fetching. Also, code might not be optimized for smoother user's experience. For first time loading, the web might take a few seconds.
+⚠️ **IMPORTANT!** ⚠️  This app currently uses a locally stored SQLite database that is bundled with the deployment, instead of fetching live weather data from an API or cloud server. As a result, the forecast data is static and only changes when the database is manually updated and re-uploaded. Because regularly refreshing the deployed database is tedious, the app uses a fixed default current time (March 22, 2026, 11:00 WIB) that falls within the available data range. This will be fixed in the future when the app is ready to be pushed to production phase.
 
 ![Jakarta Heat Risk App](/figures/main_page.png)
 
