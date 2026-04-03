@@ -753,7 +753,7 @@ def toggle_modal(_pathname, b1, b2, b3, b4, b5, close_clicks, startup_seen):
         modal_body = html.Div(
             children=[
                 html.Div(
-                    "⚠️ Important: OFFLINE UPDATE ⚠️",
+                    "⚠️ IMPORTANT! ⚠️",
                     style={
                         "fontWeight": "700",
                         "fontSize": "1.4rem",
