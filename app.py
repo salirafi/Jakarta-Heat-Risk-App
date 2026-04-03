@@ -457,8 +457,8 @@ via free public API.
                                     children=[
                                         html.Img(src="/assets/github.svg", className="footer-icon"),
                                         html.A(
-                                            "salirafi",
-                                            href="https://github.com/salirafi",
+                                            "Go to project repo",
+                                            href="https://github.com/salirafi/Jakarta-Heat-Risk-App",
                                             target="_blank",
                                             className="footer-link",
                                         ),
